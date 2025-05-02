@@ -1,4 +1,3 @@
-# DAFTAR-ML:
  **D**ata **A**gnostic **F**eature-**T**arget **A**nalysis & **R**anking **M**achine **L**earning Pipeline
  
 DAFTAR-ML is a specialized machine learning pipeline that identifies relevant features based on their relationship to a target variable. It provides:
