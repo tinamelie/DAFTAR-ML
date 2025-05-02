@@ -404,7 +404,7 @@ If you use DAFTAR-ML in academic work, please cite:
 ```
 @software{daftar2025,
   author  = {Melie, T.},
-  title   = {DAFTAR-ML – Feature Importance Ranking and Analysis Tool},
+  title   = {DAFTAR-ML},
   year    = {2025},
   url     = {https://github.com/tmelie/DAFTAR-ML},
   version = {v1.0.0}
