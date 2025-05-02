@@ -209,17 +209,6 @@ DAFTAR-ML uses nested cross-validation to provide unbiased model evaluation and 
 daftar-cv --input preprocessed_data.csv --target TARGET --id ID --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir OUTPUT_DIRECTORY
 ```
 
-#### Understanding the Output
-
-The CV calculator generates visualizations and statistics showing how your data is distributed:
-
-##### Detailed Insights
-
-- Separation of training and test sets in each outer fold
-- Distribution of samples across inner validation folds 
-- How data utilization varies across different repetitions
-- Exact sample counts for each division to ensure statistical soundness
-
 #### CV Calculator Parameters
 
 #### Required Parameters:
@@ -298,10 +287,6 @@ daftar --input preprocessed_data.csv --target TARGET --id ID --model [xgb|rf] --
 
 ## Results and Output Explanation
 
-DAFTAR-ML creates a structured output directory containing all results, visualizations, and trained models.
-
-### Directory Layout Example
-
 Each run creates a folder inside `results/` (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`):
 
 ```
@@ -351,9 +336,6 @@ Each `fold_N` directory contains:
 * **Model Files:** Trained models (`best_model_fold_N.pkl`) and test predictions
 * **Evaluation:** Fold-specific visualizations and metrics
 * **Hyperparameter Tuning:** Optimization summaries and Optuna plots
-
-
-
 
 ### Performance Evaluation Metrics
 
