@@ -13,8 +13,6 @@ The framework supports both regression and classification tasks and works with a
 ## Use Cases
 
 - **Gene-Phenotype Relationships**: Discover which genes correlate with specific phenotypes (e.g., growth on a substrate)
-- **Biomarker Discovery**: Identify features with the strongest predictive value for specific outcomes
-- **Feature Selection**: Reduce dimensionality while retaining most informative features
 
 ## Quick Start
 
