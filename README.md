@@ -25,7 +25,7 @@ The framework supports both regression and classification tasks and works with a
 | Species2 |      **0**      |       8       |       1       |       6       |
 | Species3 |     **0.01**    |       0       |       4       |       3       |
 
-In this example, we use gene clusters obtained through tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, records the growth rates of species on galactose. The aim is to identify which gene clusters (**features**) are most predictive of this **target**.
+In this example, we use gene clusters from tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, is growth rates of species in galactose. The aim is to identify which gene clusters (**features**) are important to this **target**.
 ### Results example (summary):
 | Rank |    Feature    |  Score |
 |------|:-------------:|:------:|
@@ -33,7 +33,7 @@ In this example, we use gene clusters obtained through tools like OrthoFinder as
 | 2    | Gene_cluster2 |  0.461 |
 | 3    | Gene_cluster3 |  0.321 |
 
-Running DAFTAR-ML on the dataset will produce results that score and rank these **features**.
+Running DAFTAR-ML on the dataset will score and rank these **features**.
 (Actual output will provide SHAP summary plots, cross‑validation performance metrics, and visualizations.)
 
 ### Workflow steps 
