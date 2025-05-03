@@ -17,8 +17,7 @@ The framework supports both regression and classification tasks and works with a
 
 ## Quick Start
 
-### Example dataset
-A typical dataset might look like this (comma‑separated .csv file):
+### Example dataset (comma‑separated .csv file):
 
 | Species | **Growth_on_Galactose** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
 |----------|:---------------:|:-------------:|:-------------:|:-------------:|
@@ -26,16 +25,17 @@ A typical dataset might look like this (comma‑separated .csv file):
 | Species2 |      **0**      |       8       |       1       |       6       |
 | Species3 |     **0.01**    |       0       |       4       |       3       |
 
-In this example, we use gene clusters obtained through tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, records the growth rates of species on galactose. The aim is to identify which gene clusters (**features**) are most predictive of this phenotype (**target**). Running DAFTAR-ML on this dataset will produce results that score and rank these **features**:
-
-### Results example 
+In this example, we use gene clusters obtained through tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, records the growth rates of species on galactose. The aim is to identify which gene clusters (**features**) are most predictive of this **target**.
+### Results example (summary):
 | Rank |    Feature    |  Score |
 |------|:-------------:|:------:|
 | 1    | Gene_cluster1 |  0.556 |
 | 2    | Gene_cluster2 |  0.461 |
 | 3    | Gene_cluster3 |  0.321 |
 
+Running DAFTAR-ML on the dataset will produce results that score and rank these **features**.
 (Actual output will provide SHAP summary plots, cross‑validation performance metrics, and visualizations.)
+
 ### Workflow steps 
 A typical DAFTAR-ML workflow consists of three steps:
 1. **Data Preprocessing**: Clean and prepare your data by selecting the most informative features
