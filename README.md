@@ -1,14 +1,14 @@
 ## **D**ata **A**gnostic **F**eature-**T**arget **A**nalysis & **R**anking **M**achine **L**earning Pipeline
  
-DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It provides:
+DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It supports both regression and classification tasks and works with a .csv containing a single target column and multiple feature columns.
 
-- Automated preprocessing and feature selection via mutual information
-- Robust model training with nested cross-validation 
+ Functionality Highlights:
+
+- Automated data preprocessing and feature selection via mutual information
+- Model training with nested cross-validation 
 - Hyperparameter optimization with Optuna
-- SHAPley Additive exPlanations (SHAP) for feature importance
-- Comprehensive visualization and result reporting
-
-The framework supports both regression and classification tasks and works with any tabular data containing a single target column and multiple feature columns.
+- SHAPley Additive exPlanations (SHAP) for scoring feature importance
+- Publication-quality visualizations
 
 ## Use Cases
 
