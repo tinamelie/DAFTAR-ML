@@ -1,6 +1,6 @@
 ## **D**ata **A**gnostic **F**eature-**T**arget **A**nalysis & **R**anking **M**achine **L**earning Pipeline
  
-DAFTAR-ML is a specialized machine learning pipeline that identifies relevant features based on their relationship to a target variable. It provides:
+DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It provides:
 
 - Automated preprocessing and feature selection via mutual information
 - Robust model training with nested cross-validation 
@@ -13,9 +13,30 @@ The framework supports both regression and classification tasks and works with a
 ## Use Cases
 
 - **Gene-Phenotype Relationships**: Discover which genes correlate with specific phenotypes (e.g., growth on a substrate)
+- **Other examples here***
 
 ## Quick Start
 
+### Example dataset
+A typical dataset might look like this (comma‑separated .csv file):
+
+| Species | **Growth_on_Galactose** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
+|----------|:---------------:|:-------------:|:-------------:|:-------------:|
+| Species1 |     **0.34**    |       10      |       0       |       15      |
+| Species2 |      **0**      |       8       |       1       |       6       |
+| Species3 |     **0.01**    |       0       |       4       |       3       |
+
+In this example, we use gene clusters obtained through tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, records the growth rates of species on galactose. The aim is to identify which gene clusters (**features**) are most predictive of this phenotype (**target**). Running DAFTAR-ML on this dataset will produce results that score and rank these **features**:
+
+### Results example 
+| Rank |    Feature    |  Score |
+|------|:-------------:|:------:|
+| 1    | Gene_cluster1 |  0.556 |
+| 2    | Gene_cluster2 |  0.461 |
+| 3    | Gene_cluster3 |  0.321 |
+
+(Actual output will provide SHAP summary plots, cross‑validation performance metrics, and visualizations.)
+### Workflow steps 
 A typical DAFTAR-ML workflow consists of three steps:
 1. **Data Preprocessing**: Clean and prepare your data by selecting the most informative features
 2. **Cross-Validation Calculator**: Determine the optimal CV configuration for your dataset size
