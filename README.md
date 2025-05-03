@@ -410,8 +410,8 @@ If you use DAFTAR-ML in academic work, please cite:
   author  = {Melie, T.},
   title   = {DAFTAR-ML},
   year    = {2025},
-  url     = {https://github.com/tmelie/DAFTAR-ML},
-  version = {v1.0.0}
+  url     = {https://github.com/tinamelie/DAFTAR-ML},
+  version = {v0.0.0}
 }
 ```
 
