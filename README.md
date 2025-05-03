@@ -219,6 +219,7 @@ The preprocessing module uses mutual information to select features with the str
 ### 2. Cross-Validation Configuration
 
 The CV calculator is a planning tool to help you determine appropriate cross-validation parameters before running the main DAFTAR-ML pipeline. It visualizes different CV configurations to help you make an informed decision about your dataset splits.
+Note: This does not produce any modified or processed data from your input. This is simply a tool to help you select your parameters. It can be skipped if you already have a configuration in mind or prefer the defaults.
 
 ### Nested Cross-Validation Approach
 
