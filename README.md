@@ -1,21 +1,42 @@
 ## **D**ata **A**gnostic **F**eature-**T**arget **A**nalysis & **R**anking **M**achine **L**earning Pipeline
  
-DAFTAR-ML is a specialized machine learning pipeline that identifies relevant features based on their relationship to a target variable. It provides:
+DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It supports both regression and classification tasks and works with a .csv containing a single target column and multiple feature columns.
 
-- Automated preprocessing and feature selection via mutual information
-- Robust model training with nested cross-validation 
+ Functionality Highlights:
+
+- Automated data preprocessing and feature selection via mutual information
+- Model training with nested cross-validation 
 - Hyperparameter optimization with Optuna
-- SHAPley Additive exPlanations (SHAP) for feature importance
-- Comprehensive visualization and result reporting
-
-The framework supports both regression and classification tasks and works with any tabular data containing a single target column and multiple feature columns.
+- SHAPley Additive exPlanations (SHAP) for scoring feature importance
+- Publication-quality visualizations
 
 ## Use Cases
 
 - **Gene-Phenotype Relationships**: Discover which genes correlate with specific phenotypes (e.g., growth on a substrate)
+- **Other examples here***
 
 ## Quick Start
 
+### Example dataset (comma‑separated .csv file):
+
+| Species | **Growth_on_Galactose** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
+|----------|:---------------:|:-------------:|:-------------:|:-------------:|
+| Species1 |     **0.34**    |       10      |       0       |       15      |
+| Species2 |      **0**      |       8       |       1       |       6       |
+| Species3 |     **0.01**    |       0       |       4       |       3       |
+
+In this example, we use gene clusters from tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, is growth rates of species in galactose. The aim is to identify which gene clusters (**features**) are important to this **target**.
+### Results example (summary):
+| Rank |    Feature    |  Score |
+|------|:-------------:|:------:|
+| 1    | Gene_cluster1 |  0.556 |
+| 2    | Gene_cluster2 |  0.461 |
+| 3    | Gene_cluster3 |  0.321 |
+
+Running DAFTAR-ML on the dataset will score and rank these **features**.
+(Actual output will provide SHAP summary plots, cross‑validation performance metrics, and visualizations.)
+
+### Workflow steps 
 A typical DAFTAR-ML workflow consists of three steps:
 1. **Data Preprocessing**: Clean and prepare your data by selecting the most informative features
 2. **Cross-Validation Calculator**: Determine the optimal CV configuration for your dataset size
@@ -198,6 +219,7 @@ The preprocessing module uses mutual information to select features with the str
 ### 2. Cross-Validation Configuration
 
 The CV calculator is a planning tool to help you determine appropriate cross-validation parameters before running the main DAFTAR-ML pipeline. It visualizes different CV configurations to help you make an informed decision about your dataset splits.
+Note: This does not produce any modified or processed data from your input. This is simply a tool to help you select your parameters. It can be skipped if you already have a configuration in mind or prefer the defaults.
 
 ### Nested Cross-Validation Approach
 
@@ -388,8 +410,8 @@ If you use DAFTAR-ML in academic work, please cite:
   author  = {Melie, T.},
   title   = {DAFTAR-ML},
   year    = {2025},
-  url     = {https://github.com/tmelie/DAFTAR-ML},
-  version = {v1.0.0}
+  url     = {https://github.com/tinamelie/DAFTAR-ML},
+  version = {v0.0.0}
 }
 ```
 
