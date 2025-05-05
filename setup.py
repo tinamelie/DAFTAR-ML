@@ -1,8 +1,9 @@
 from setuptools import setup, find_packages
 from pathlib import Path
+from typing import List, Dict
 
 
-def read_requirements() -> list[str]:
+def read_requirements() -> List[str]:
     """Return a list of requirements from requirements.txt (if present)."""
     req_path = Path(__file__).with_name("requirements.txt")
     if req_path.exists():
@@ -12,7 +13,7 @@ def read_requirements() -> list[str]:
 
 
 # Extract version without importing the package (to avoid dependency issues)
-about: dict[str, str] = {}
+about: Dict[str, str] = {}
 init_path = Path(__file__).parent / "daftar" / "__init__.py"
 if init_path.exists():
     with init_path.open() as f:
