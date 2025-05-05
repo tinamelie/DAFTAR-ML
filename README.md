@@ -38,7 +38,7 @@ Running DAFTAR-ML on the dataset will score and rank these **features**.
 
 ### Workflow steps 
 A typical DAFTAR-ML workflow consists of three steps:
-1. **Data Preprocessing**: daftar-preprocessClean and prepare your data by selecting the most informative features
+1. **Data Preprocessing**: Clean and prepare your data by selecting the most informative features
 2. **Cross-Validation Calculator**: Determine the optimal CV configuration for your dataset size
 3. **Model Training & Analysis**: Train models with nested CV and analyze features
 
