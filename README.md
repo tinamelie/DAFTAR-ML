@@ -216,15 +216,21 @@ The preprocessing module uses mutual information to select features with the str
 * `--quiet`: Suppress detailed console output during processing.
 * `--no_report`: Skip generating the detailed text report and feature importance CSV files (these are produced by default).
 
-### 2. Cross-Validation Configuration
+### 2. Cross-Validation Configuration Calculator
 
-The CV calculator is a planning tool to help you determine appropriate cross-validation parameters before running the main DAFTAR-ML pipeline. It visualizes different CV configurations to help you make an informed decision about your dataset splits.
-Note: This does not produce any modified or processed data from your input. This is simply a tool to help you select your parameters. It can be skipped if you already have a configuration in mind or prefer the defaults.
+The CV calculator is a planning tool for visualizing and analyzing your cross-validation splits. It provides detailed visualizations of target value distributions across CV splits, statistical validation of fold quality, and comprehensive reporting to help you evaluate your CV strategy before running the main DAFTAR-ML pipeline.
+
+This tool generates visual and statistical analysis of your dataset splits including:
+- Target distribution visualizations across all folds with automatically optimized bin sizes
+- Statistical validation of fold quality using p-value tests
+- CSV exports of sample assignments to train/validation/test sets
+- Fold-by-fold breakdown reports
+
+Note: This does not produce any modified or processed data from your input. This is simply a tool to help you select your parameters. It can be skipped if you already have a configuration in mind, have balanced classes/distributions, or prefer the defaults.
 
 ### Nested Cross-Validation Approach
 
 DAFTAR-ML uses nested cross-validation to provide unbiased model evaluation and prevent data leakage:
-
 ##### CV Calculator Usage
 
 ```bash
@@ -247,11 +253,29 @@ daftar-cv --input preprocessed_data.csv --target TARGET --id ID --outer INTEGER 
 
 Note: If you specify any of the CV parameters (outer, inner, repeats), you must specify all three.
 
+* `--random_seed INTEGER`: Random seed for reproducibility. Using the same seed ensures identical fold splits
+
 ##### Output Configuration:
-* `--output_dir PATH`: Directory where output files will be saved. If specified, results will be saved to this directory
-* `--force`: Force overwrite if output files already exist
+* `--output_dir PATH`: Directory where output files and visualizations will be saved
+* `--force`: Force overwrite if output files already exist in the results directory
+
+#### Generated Output Files:
+
+##### CSV Exports:
+* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_splits_basic.csv`: Simple dataset showing sample assignments to train/test for each outer fold
+* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_splits_granular.csv`: Detailed dataset showing all sample assignments across all folds and repeats
+
+##### Visualizations:
+* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_overall_distribution.png/pdf`: Histogram/density plot of the overall target distribution with automatically optimized bin sizes
+* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_histograms.png/pdf`: Multi-panel visualization comparing train/test distributions for each fold with automatically optimized bin sizes
+
+##### Reports:
+* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_fold_report.txt`: Statistical assessment of fold quality with p-value tests
 
 #### Cross-Validation Guidelines
+
+##### Important Notes:
+- DAFTAR-ML's cross-validation implementation **always uses shuffling by default** to ensure more representative data distribution across splits.
 
 ##### Rules of thumb:
 
