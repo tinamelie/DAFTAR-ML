@@ -274,20 +274,26 @@ def main(args: Optional[List[str]] = None) -> int:
                 target_data = data[target_col].dropna()
                 unique_values = target_data.unique()
                 
-                # If only 2 unique values or boolean values, it's classification
-                if len(unique_values) <= 2 or target_data.dtype == bool:
-                    task_type = "classification"
-                    print(f"Auto-detected CLASSIFICATION task")
-                else:
-                    # If more than 2 unique values and numeric, it's likely regression
-                    if pd.api.types.is_numeric_dtype(target_data):
+                # First check the data type
+                if pd.api.types.is_numeric_dtype(target_data):
+                    # For numeric data, check number of unique values
+                    if len(unique_values) <= 2 or target_data.dtype == bool:
+                        # Binary numeric values (like 0/1) suggest classification
+                        task_type = "classification"
+                        print(f"Auto-detected CLASSIFICATION task (binary)")
+                    else:
+                        # Multiple numeric values suggest regression
                         task_type = "regression"
                         print(f"Auto-detected REGRESSION task")
+                else:
+                    # Non-numeric (string/categorical) data is always classification
+                    # (regardless of number of unique values)
+                    task_type = "classification"
+                    if len(unique_values) <= 2:
+                        print(f"Auto-detected CLASSIFICATION task (binary)")
                     else:
-                        # If more than 2 unique values but not numeric, default to classification with a warning
-                        task_type = "classification"
-                        print(f"Auto-detection unclear - defaulting to CLASSIFICATION task")
-                        print(f"   Use --task regression|classification to specify if needed")
+                        print(f"Auto-detected CLASSIFICATION task (multiclass)")
+                    
                 
                 config_dict['problem_type'] = task_type
                 
@@ -348,7 +354,6 @@ def main(args: Optional[List[str]] = None) -> int:
         pipeline.run()
     except FileExistsError as e:
         print(f"ERROR: {str(e)}")
-        # Don't print traceback for file existence errors - it's cleaner
         return 1
     except Exception as e:
         print(f"ERROR: Pipeline execution failed: {str(e)}")

@@ -177,8 +177,8 @@ The preprocessing module uses mutual information to select features with the str
 
 **Important:**  
 - DAFTAR-ML processes only **one target variable** per run
-- Classification targets must be **binary** (0/1 or True/False only)
-- Multi-class classification is not supported yet
+- Supports both **binary** and **multiclass classification**
+- Both XGBoost and Random Forest algorithms are configured to automatically handle multiclass problems
 
 #### Required Parameters:
 * `--input PATH`: Path to input CSV file
@@ -275,6 +275,7 @@ Note: If you specify any of the CV parameters (outer, inner, repeats), you must 
   - For regression tasks: Kolmogorov-Smirnov test comparing value distributions
   - p-value ≥ 0.05 indicates train/test sets have similar distributions (good fold quality)
   - p-value < 0.05 indicates statistically significant differences between train/test distributions (potential fold quality issue)
+Note: Larger p-values are better for fold quality.
 
 #### Cross-Validation Guidelines
 
