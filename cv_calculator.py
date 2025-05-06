@@ -154,7 +154,7 @@ def get_base_name(
         Standardized base name string for files and directories
     """
     problem_type = "classif" if is_classification else "regression"
-    base = f"CV_{target}_{problem_type}_cv{inner}x{outer}x{repeats}"
+    base = f"CV_{target}_{problem_type}_cv{outer}x{inner}x{repeats}"
     if seed is not None:
         return f"{base}_seed{seed}"
     return base

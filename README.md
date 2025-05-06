@@ -262,15 +262,15 @@ Note: If you specify any of the CV parameters (outer, inner, repeats), you must 
 #### Generated Output Files:
 
 ##### CSV Exports:
-* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_splits_basic.csv`: Simple dataset showing sample assignments to train/test for each outer fold
-* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_splits_granular.csv`: Detailed dataset showing all sample assignments across all folds and repeats
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_splits_basic.csv`: Simple dataset showing sample assignments to train/test for each outer fold
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_splits_granular.csv`: Detailed dataset showing all sample assignments across all folds and repeats
 
 ##### Visualizations:
-* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_overall_distribution.png/pdf`: Histogram/density plot of the overall target distribution with automatically optimized bin sizes
-* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_histograms.png/pdf`: Multi-panel visualization comparing train/test distributions for each fold with automatically optimized bin sizes
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_overall_distribution.png/pdf`: Histogram/density plot of the overall target distribution with automatically optimized bin sizes
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_histograms.png/pdf`: Multi-panel visualization comparing train/test distributions for each fold with automatically optimized bin sizes
 
 ##### Reports:
-* `CV_[target]_[task-type]_cv[inner]x[outer]x[repeats]_fold_report.txt`: Statistical assessment of fold quality with p-value tests
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_fold_report.txt`: Statistical assessment of fold quality with p-value tests
 
 #### Cross-Validation Guidelines
 
@@ -337,7 +337,7 @@ Each run creates a folder inside the current directory (or the path specified by
 
 ```
 results/
-└── DAFTAR-ML_GrowthRate_random_forest_regression_cv5x5x3/
+└── DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
     ├── DAFTAR-ML_run.log                     # Combined console + file log
     ├── metrics_overall.csv                   # Mean scores across folds
     ├── shap_feature_impact_analysis.csv      # Signed SHAP importances (mean)

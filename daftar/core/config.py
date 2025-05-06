@@ -141,7 +141,7 @@ class Config:
         # Transformation info now in preprocessed filename
             
         # Add CV info
-        components.append(f"cv{self.inner_folds}x{self.outer_folds}x{self.repeats}")
+        components.append(f"cv{self.outer_folds}x{self.inner_folds}x{self.repeats}")
         
         return "_".join(components)
     
