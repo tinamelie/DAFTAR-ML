@@ -64,7 +64,9 @@ def setup_logging(output_dir=None):
     if output_dir:
         try:
             output_dir = os.path.abspath(output_dir)
-            os.makedirs(output_dir, exist_ok=True)
+            # IMPORTANT: Do NOT create the directory here with os.makedirs
+            # This directory must have been validated and created before
+            # we get here, or else we risk creating directories we don't want
             log_file = os.path.join(output_dir, 'DAFTAR-ML_run.log')
             file_handler = logging.FileHandler(log_file)
             file_handler.setFormatter(formatter)
@@ -86,7 +88,50 @@ class Pipeline:
             config: Pipeline configuration
         """
         self.config = config
-        self.output_dir = config.get_output_dir()
+        
+        # First set up ONLY console logging without any file output
+        self.logger = setup_logging(None)
+        
+        # Calculate expected output path WITHOUT creating anything yet
+        auto_name = config.get_auto_name()
+        if config.output_dir:
+            # Use user-provided directory with auto-generated name
+            root_dir = Path(config.output_dir)
+            output_path = root_dir / auto_name
+        else:
+            # Use default root with auto name
+            root_dir = Path(config.results_root or os.getenv("DAFTAR-ML_RESULTS_DIR", Path.cwd()))
+            output_path = root_dir / auto_name
+            
+        # Check if directory exists and contains files BEFORE creating anything
+        if output_path.exists():
+            # First make a list to avoid any dir creation during checking
+            entries = []
+            try:
+                if output_path.is_dir():
+                    entries = list(output_path.iterdir())
+            except Exception:
+                pass  # Just continue if we can't check
+                
+            if entries and not config.force_overwrite:
+                error_msg = f"Output directory already exists and contains files: {output_path}\n"
+                error_msg += f"Use --force flag to overwrite existing files.\n\n"
+                # Only include required parameters in the example
+                error_msg += f"Example: daftar --input {config.input_file} --target {config.target} --id {config.id_column} --model {config.model}"
+                
+                # Only add output_dir to example if it was explicitly specified
+                if config.output_dir:
+                    error_msg += f" --output_dir {config.output_dir}"
+                    
+                error_msg += " --force"
+                
+                raise FileExistsError(error_msg)
+        
+        # Now it's safe to create the directory
+        output_path.mkdir(parents=True, exist_ok=True)
+        self.output_dir = output_path
+        
+        # Now we can safely add file logging since we've validated the directory
         self.logger = setup_logging(self.output_dir)
         self.model = None
         

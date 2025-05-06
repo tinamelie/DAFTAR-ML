@@ -146,55 +146,24 @@ class Config:
         return "_".join(components)
     
     def get_output_dir(self) -> Path:
-        """Get output directory path without timestamp.
-        
-        Uses DAFTAR-ML_RESULTS_DIR environment variable as the root if set.
-        Otherwise, creates a 'results' directory in the current working directory.
+        """Get the output directory for saving results.
         
         Returns:
-            Path to output directory
-        """
-        # Get results root directory from environment variable or default
-        # Use current working directory by default instead of a 'results' subdirectory
-        root_dir = Path(self.results_root or os.getenv("DAFTAR-ML_RESULTS_DIR", Path.cwd()))
-        root_dir.mkdir(parents=True, exist_ok=True)
         
-        # Get the auto-named directory based on model type and parameters
+        Returns:
+            Path object for the output directory (which may or may not exist yet)
+        """
+        # Generate auto name if needed
         auto_name = self.get_auto_name()
         
-        # If custom output directory is provided, use it as the root and add the auto-named directory
         if self.output_dir:
-            # Parse the output_dir to handle both Path objects and strings
-            output_dir_path = Path(self.output_dir)
-            
-            # If output_dir is just a dot, use root_dir directly
-            if str(output_dir_path) == ".":
-                output_path = root_dir / auto_name
-            else:
-                # Otherwise create the auto-named subdirectory inside the specified output_dir
-                output_path = output_dir_path / auto_name
+            # Use user-provided directory with auto-generated name
+            root_dir = Path(self.output_dir)
+            output_path = root_dir / auto_name
         else:
             # Use default root with auto name
+            root_dir = Path(self.results_root or os.getenv("DAFTAR-ML_RESULTS_DIR", Path.cwd()))
             output_path = root_dir / auto_name
-        
-        # Check if directory exists and contains files
-        if output_path.exists() and any(output_path.iterdir()) and not self.force_overwrite:
-            # Build a helpful error message that doesn't include None values or optional parameters
-            error_msg = f"Output directory already exists and contains files: {output_path}\n"
-            error_msg += f"Use --force flag to overwrite existing files.\n\n"
-            # Only include required parameters in the example
-            error_msg += f"Example: daftar --input {self.input_file} --target {self.target} --id {self.id_column} --model {self.model}"
-            
-            # Only add output_dir to example if it was explicitly specified
-            if self.output_dir:
-                error_msg += f" --output_dir {self.output_dir}"
-                
-            error_msg += " --force"
-            
-            raise FileExistsError(error_msg)
-        
-        # Create the directory
-        output_path.mkdir(parents=True, exist_ok=True)
         
         return output_path
     

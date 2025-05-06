@@ -346,6 +346,10 @@ def main(args: Optional[List[str]] = None) -> int:
     try:
         pipeline = Pipeline(config)
         pipeline.run()
+    except FileExistsError as e:
+        print(f"ERROR: {str(e)}")
+        # Don't print traceback for file existence errors - it's cleaner
+        return 1
     except Exception as e:
         print(f"ERROR: Pipeline execution failed: {str(e)}")
         import traceback
