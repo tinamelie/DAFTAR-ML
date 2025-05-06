@@ -75,18 +75,19 @@ DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on yo
 DAFTAR-ML expects a comma-separated (.csv) matrix with the following columns:
 
 - **ID**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--id`.
-- **Target**: Response variable to predict (e.g., growth rate, yield, etc.). May be continuous or binary. Specify with `--target`.        
+- **Target**: Response variable to predict (e.g., growth rate, yield, etc.). May be continuous (regression) or categorical (binary or multiclass classification). Specify with `--target`.        
 - **Features**: Predictor columns (e.g., orthologous gene counts, CAI values, expression profiles).
 
  **Target Variable Requirements:**  
  - Each dataset must have exactly **one target column**.
- - For classification problems, target values must be **binary** (e.g., 0/1, True/False, Yes/No).
- - DAFTAR-ML does not support multi-class classification yet.
+ - For classification problems, target values can be **binary** (e.g., 0/1, True/False, Yes/No) or **multiclass** (e.g., categories like 'low', 'medium', 'high').
 
-Example provided in [`test_data/`](test_data):
+Examples provided in [`test_data/`](test_data):
 
-* `Test_data_binary.csv` – binary classification example
+* `Test_data_binary.csv` – binary classification example (0/1 targets)
 * `Test_data_continuous.csv` – regression example with continuous targets
+
+Note: DAFTAR-ML supports multiclass classification as well (categorical targets with more than two values)
 
 ## Setup
 
