@@ -253,7 +253,7 @@ daftar-cv --input preprocessed_data.csv --target TARGET --id ID --outer INTEGER 
 
 Note: If you specify any of the CV parameters (outer, inner, repeats), you must specify all three.
 
-* `--random_seed INTEGER`: Random seed for reproducibility. Using the same seed ensures identical fold splits
+* `--seed INTEGER`: Random seed for reproducibility. Using the same seed ensures identical fold splits
 
 ##### Output Configuration:
 * `--output_dir PATH`: Directory where output files and visualizations will be saved
@@ -333,7 +333,7 @@ daftar --input preprocessed_data.csv --target TARGET --id ID --model [xgb|rf] --
 
 ## Results and Output Explanation
 
-Each run creates a folder inside `results/` (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`):
+Each run creates a folder inside the current directory (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`):
 
 ```
 results/
