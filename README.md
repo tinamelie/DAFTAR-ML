@@ -94,7 +94,7 @@ Example provided in [`test_data/`](test_data):
 
 1. First, clone this repository and navigate to the DAFTAR-ML directory:
    ```bash
-   git clone https://github.com/tmelie/DAFTAR-ML.git
+   git clone https://github.com/tinamelie/DAFTAR-ML.git
    cd DAFTAR-ML
    ```
 
