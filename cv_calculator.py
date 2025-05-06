@@ -137,7 +137,8 @@ def get_base_name(
     is_classification: bool,
     inner: int,
     outer: int,
-    repeats: int
+    repeats: int,
+    seed: Optional[int] = None
 ) -> str:
     """Generate standardized base name for directory and files.
     
@@ -147,12 +148,16 @@ def get_base_name(
         inner: Number of inner folds
         outer: Number of outer folds
         repeats: Number of repeats
+        seed: Optional random seed to include in the name
         
     Returns:
         Standardized base name string for files and directories
     """
     problem_type = "classif" if is_classification else "regression"
-    return f"CV_{target}_{problem_type}_cv{inner}x{outer}x{repeats}"
+    base = f"CV_{target}_{problem_type}_cv{inner}x{outer}x{repeats}"
+    if seed is not None:
+        return f"{base}_seed{seed}"
+    return base
 
 
 def save_splits_csv(
@@ -360,7 +365,7 @@ def get_args() -> argparse.Namespace:
     cv.add_argument("--outer", type=int, default=5, help="Outer folds (default=5)")
     cv.add_argument("--inner", type=int, default=3, help="Inner folds (default=3)")
     cv.add_argument("--repeats", type=int, default=3, help="Repeats (default=3)")
-    cv.add_argument("--random_seed", type=int, help="Seed for reproducibility")
+    cv.add_argument("--seed", type=int, help="Random seed for reproducibility")
     
     task.add_argument(
         "--task_type",
@@ -417,14 +422,14 @@ def main() -> None:
         print(f"User-specified {task_type.upper()} task")
 
     # Repeated-KFold
-    seed = args.random_seed or np.random.randint(0, 2**31 - 1)
+    seed = args.seed or np.random.randint(0, 2**31 - 1)
     outer_cv = RepeatedKFold(
         n_splits=args.outer, n_repeats=args.repeats, random_state=seed
     )
 
     # Generate base filename
     base_name = get_base_name(
-        args.target, is_cls, args.inner, args.outer, args.repeats
+        args.target, is_cls, args.inner, args.outer, args.repeats, seed
     )
     
     # Create a results directory
@@ -447,8 +452,8 @@ def main() -> None:
             cmd += f" --inner {args.inner}"
         if args.repeats != 3:
             cmd += f" --repeats {args.repeats}"
-        if args.random_seed:
-            cmd += f" --random_seed {args.random_seed}"
+        if args.seed:
+            cmd += f" --seed {args.seed}"
         if args.task_type:
             cmd += f" --task_type {args.task_type}"
             
