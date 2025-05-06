@@ -4,6 +4,7 @@ import numpy as np
 import optuna
 import warnings
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 import shap
 
@@ -23,7 +24,19 @@ class XGBoostClassificationModel(BaseClassificationModel):
         """
         # Suppress ALL XGBoost warnings for a cleaner output
         warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
-        def objective(trial):
+        
+        # Handle string labels by encoding them
+        self.le = LabelEncoder()
+        y_encoded = self.le.fit_transform(y)
+        
+        # Determine if this is a binary or multi-class problem
+        n_classes = len(np.unique(y))
+        if n_classes <= 2:
+            xgb_objective = 'binary:logistic'
+        else:
+            xgb_objective = 'multi:softprob'
+            
+        def objective_func(trial):
             params = {
                 'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
                 'max_depth': trial.suggest_int('max_depth', 3, 10),
@@ -32,26 +45,34 @@ class XGBoostClassificationModel(BaseClassificationModel):
                 'subsample': trial.suggest_float('subsample', 0.6, 1.0),
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
                 'gamma': trial.suggest_float('gamma', 1e-3, 1.0, log=True),
-                'objective': 'binary:logistic',
+                'objective': xgb_objective,
                 'eval_metric': 'logloss',
                 'random_state': self.seed,
                 'use_label_encoder': False,
                 'n_jobs': self.n_jobs
             }
             
+            # Add num_class parameter for multi-class problems
+            if xgb_objective == 'multi:softprob':
+                params['num_class'] = n_classes
+            
             model = XGBClassifier(**params)
-            model.fit(X, y)
+            model.fit(X, y_encoded)
             y_pred = model.predict(X)
             
             if self.metric == 'accuracy':
-                return -accuracy_score(y, y_pred)  # Negative for minimization
+                return -accuracy_score(y_encoded, y_pred)  # Negative for minimization
             elif self.metric == 'f1':
-                return -f1_score(y, y_pred)  # Negative for minimization
+                return -f1_score(y_encoded, y_pred)  # Negative for minimization
             elif self.metric == 'roc_auc':
-                y_pred_proba = model.predict_proba(X)[:, 1]
-                return -roc_auc_score(y, y_pred_proba)  # Negative for minimization
+                if xgb_objective == 'binary:logistic':
+                    y_pred_proba = model.predict_proba(X)[:, 1]
+                    return -roc_auc_score(y_encoded, y_pred_proba)  # Negative for minimization
+                else:
+                    # For multi-class, we can't use regular ROC AUC
+                    return -accuracy_score(y_encoded, y_pred)  # Fall back to accuracy
             else:
-                return -accuracy_score(y, y_pred)  # Default to accuracy
+                return -accuracy_score(y_encoded, y_pred)  # Default to accuracy
                 
             return score
 
@@ -88,7 +109,7 @@ class XGBoostClassificationModel(BaseClassificationModel):
                       f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {best_value_to_display}.")
         
         study.optimize(
-            objective,
+            objective_func,
             n_trials=self.n_trials,
             callbacks=[early_stopping, log_trial_callback]
         )
@@ -98,14 +119,21 @@ class XGBoostClassificationModel(BaseClassificationModel):
         
         best_params = study.best_params
         best_params.update({
-            'objective': 'binary:logistic',
+            'objective': xgb_objective,
             'eval_metric': 'logloss',
             'use_label_encoder': False,
             'random_state': self.seed
         })
         
+        # Add num_class parameter for multi-class problems
+        if xgb_objective == 'multi:softprob':
+            best_params['num_class'] = n_classes
+        
         self.model = XGBClassifier(**best_params)
-        self.model.fit(X, y)
+        self.model.fit(X, y_encoded)
+        
+        # Store the LabelEncoder for later use
+        self.classes_ = self.le.classes_
         
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Make predictions.
@@ -116,7 +144,9 @@ class XGBoostClassificationModel(BaseClassificationModel):
         Returns:
             Predicted classes
         """
-        return self.model.predict(X)
+        # Get numeric predictions and convert back to original labels
+        y_pred_num = self.model.predict(X)
+        return self.le.inverse_transform(y_pred_num.astype(int))
     
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """Make probability predictions.
@@ -127,6 +157,8 @@ class XGBoostClassificationModel(BaseClassificationModel):
         Returns:
             Predicted probabilities
         """
+        # Return probabilities without modifying them
+        # The probabilities already match the order of self.le.classes_
         return self.model.predict_proba(X)
         
     @property

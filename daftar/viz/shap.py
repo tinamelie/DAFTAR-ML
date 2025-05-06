@@ -105,8 +105,8 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         "Std_MeanAcrossFolds": std_across,
         "Impact_Magnitude": np.abs(mean_signed),
         "Impact_Direction": ["Positive" if v > 0 else "Negative" if v < 0 else "Neutral"
-                            for v in mean_signed],
-        "Fold_Consistency": fold_consistency
+                            for v in mean_signed]
+        # Fold_Consistency removed as requested
     }, index=overall_X_test.columns)
 
     # ----------------------------
@@ -145,7 +145,7 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
 
     # Create figure with appropriate size and colors
     fig, ax = plt.subplots(figsize=(10, max(4, len(bar_df) * 0.4)))
-    ax.set_facecolor('#E6E6E6')
+    ax.set_facecolor('#F0F0F0')
 
     # Draw error bars with caps
     for y, (_, row) in zip(ys, bar_df.iterrows()):
@@ -253,8 +253,15 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # -------------------------------------------------------------------------
     # Save detailed CSV
     # -------------------------------------------------------------------------
+    # For classification problems, remove the Target_Correlation column
+    output_df = shap_signed_df.copy()
+    
+    if problem_type == "classification":
+        if "Target_Correlation" in output_df.columns:
+            output_df = output_df.drop(columns=["Target_Correlation"])
+    
     csv_path = os.path.join(main_output_dir, "shap_feature_impact_analysis.csv")
-    shap_signed_df.sort_values("Impact_Magnitude", ascending=False).to_csv(csv_path, index_label="Feature")
+    output_df.sort_values("Impact_Magnitude", ascending=False).to_csv(csv_path, index_label="Feature")
     print(f"SHAP feature impact analysis CSV saved to {csv_path}")
 
     # -------------------------------------------------------------------------

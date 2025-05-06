@@ -61,9 +61,7 @@ class Config:
     # Required parameters (continued)
     id_column: str
     metric: Optional[str] = None  # Will be set based on problem_type if None
-    
-    # Transformation parameters now handled in preprocessing
-    
+        
     # Cross-validation parameters
     inner_folds: int = 3
     outer_folds: int = 5
@@ -101,8 +99,6 @@ class Config:
             self.relative_threshold = METRIC_DEFAULT_RELATIVE_THRESHOLDS.get(
                 self.metric, DEFAULT_RELATIVE_THRESHOLD
             )
-        
-        # Transformations now handled in preprocessing
         
         # Convert input_file to Path
         if isinstance(self.input_file, str):
@@ -159,7 +155,8 @@ class Config:
             Path to output directory
         """
         # Get results root directory from environment variable or default
-        root_dir = Path(self.results_root or os.getenv("DAFTAR-ML_RESULTS_DIR", Path.cwd() / "results"))
+        # Use current working directory by default instead of a 'results' subdirectory
+        root_dir = Path(self.results_root or os.getenv("DAFTAR-ML_RESULTS_DIR", Path.cwd()))
         root_dir.mkdir(parents=True, exist_ok=True)
         
         # Get the auto-named directory based on model type and parameters

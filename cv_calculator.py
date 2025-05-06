@@ -654,7 +654,7 @@ def main() -> None:
     daftar_cmd = (
         f"  daftar --input {args.input} --target {args.target} --id {args.id} "
         f"--outer {args.outer} --inner {args.inner} --repeats {args.repeats} "
-        f"--random_state {seed} --model [xgb|rf]"
+        f"--seed {seed} --model [xgb|rf]"
     )
     if args.output_dir:
         daftar_cmd += f" --output_dir {args.output_dir}"

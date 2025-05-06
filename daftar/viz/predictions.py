@@ -3,7 +3,7 @@
 import os
 import warnings
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Tuple, List, Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,44 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_dir, original_ids=None):
+def determine_task_type(y: pd.Series) -> Tuple[bool, str]:
+    """
+    Decide if *y* is classification or regression.
+
+    Criteria:
+    1. Any pandas.Categorical dtype        -> classification
+    2. Any non‑numeric / object dtype      -> classification
+    3. Binary data (exactly 0/1 or True/False) -> classification
+    4. Integer data with only a few values  -> classification
+    5. Otherwise                           -> regression
+    
+    Args:
+        y: Series containing target values
+        
+    Returns:
+        Tuple of (is_classification, task_type_string)
+    """
+    if pd.api.types.is_categorical_dtype(y):
+        return True, "classification"
+    if not pd.api.types.is_numeric_dtype(y):
+        return True, "classification"
+    
+    # Check for binary classification
+    unique_values = set(y.unique())
+    if unique_values == {0, 1} or unique_values == {False, True}:
+        return True, "classification"
+    
+    # Check if data appears to be multi-class (integers with small range)
+    if pd.api.types.is_integer_dtype(y):
+        min_val, max_val = y.min(), y.max()
+        # If all values are integers in a small range and there aren't too many unique values
+        if 0 <= min_val and max_val <= 3 and len(unique_values) <= (max_val - min_val + 1):
+            return True, "classification"
+        
+    return False, "regression"
+
+
+def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_dir, original_ids=None, problem_type=None):
     """Save a CSV listing the predicted vs. actual target values for each sample in this fold.
     
     Args:
@@ -38,18 +75,38 @@ def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_d
         # Create placeholder IDs if none are provided
         display_ids = [f"Sample_{i+1}" for i in range(len(y_pred))]
     
-    # Calculate residuals
-    residuals = y_test_array - y_pred_array
-    df = pd.DataFrame({
+    # Determine problem type - use explicit parameter if provided, otherwise use smart detection
+    if problem_type is None:
+        # Convert arrays to pandas Series for smart detection
+        y_test_series = pd.Series(y_test)
+        is_classification, detected_type = determine_task_type(y_test_series)
+        is_regression = not is_classification
+    else:
+        # Use the explicitly provided problem type
+        is_regression = problem_type.lower() == 'regression'
+    
+    # Create DataFrame with base columns
+    data_dict = {
         'ID': display_ids,  # These should be original IDs from the dataset when available
         'Predicted': y_pred,
-        'Actual': y_test,
-        'Residual': residuals,
-        'Abs_Residual': np.abs(residuals)
-    })
+        'Actual': y_test
+    }
     
-    # Sort by absolute residual for easier analysis
-    df = df.sort_values('Abs_Residual', ascending=False)
+    # Add residual columns only for regression problems
+    if is_regression:
+        residuals = y_test_array - y_pred_array
+        data_dict['Residual'] = residuals
+        data_dict['Abs_Residual'] = np.abs(residuals)
+    # No additional columns for classification problems
+        
+    df = pd.DataFrame(data_dict)
+    
+    # Sort by appropriate column for easier analysis
+    if is_regression:
+        # For regression, sort by absolute residual
+        df = df.sort_values('Abs_Residual', ascending=False)
+    else:        # Just keep original order or sort by ID for consistency
+        df = df.sort_values('ID')
     
     # Save to CSV, ensuring NA values are preserved
     csv_path = os.path.join(fold_dir, f"predictions_vs_actual_fold_{fold_idx}.csv")
@@ -84,7 +141,7 @@ def evaluate_predictions(y_true, y_pred):
     }
 
 
-def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matrix"):
+def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matrix", metric=None):
     """Generate a confusion matrix plot.
     
     Args:
@@ -92,36 +149,65 @@ def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matr
         y_pred: Predicted labels
         output_path: Path to save the plot
         title: Title of the plot
+        metric: Primary metric to display (default: accuracy)
     """
-    from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, roc_auc_score
+    from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, roc_auc_score, precision_score, recall_score
+    import os
+    
+    # Get unique classes preserving the original order
+    classes = np.unique(np.concatenate((y_true, y_pred)))
+    class_indices = {cls: i for i, cls in enumerate(classes)}
     
     # Calculate confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, labels=classes)
     
-    # Create plot
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
-    plt.title(title)
-    plt.ylabel("True Label")
-    plt.xlabel("Predicted Label")
+    # Create plot with larger size and higher DPI for clarity
+    plt.figure(figsize=(10, 8), dpi=150)
     
-    # Add metrics as text
-    accuracy = accuracy_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred, average='weighted')
-    metrics_text = f"Accuracy: {accuracy:.4f}\nF1 Score: {f1:.4f}"
+    # Use a more distinct colormap and larger font sizes
+    ax = sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
+               xticklabels=classes, yticklabels=classes, annot_kws={"size": 16})
     
-    # Try to add ROC AUC if binary classification
-    classes = np.unique(y_true)
-    if len(classes) == 2:
+    # Increase font sizes for better readability
+    plt.title(title, fontsize=18, pad=20)
+    plt.ylabel("True Label", fontsize=16, labelpad=15)
+    plt.xlabel("Predicted Label", fontsize=16, labelpad=15)
+    
+    # Set tick size
+    ax.tick_params(labelsize=14)
+    
+    # Get appropriate metric based on what was selected or available
+    # Default to accuracy if not specified
+    if not metric:
+        metric = os.environ.get('DAFTAR-ML_METRIC', 'accuracy')
+    
+    # Calculate the selected metric
+    if metric == 'accuracy':
+        metric_value = accuracy_score(y_true, y_pred)
+        metric_text = f"Accuracy: {metric_value:.4f}"
+    elif metric == 'f1':
+        metric_value = f1_score(y_true, y_pred, average='weighted')
+        metric_text = f"F1 Score: {metric_value:.4f}"
+    elif metric == 'precision':
+        metric_value = precision_score(y_true, y_pred, average='weighted')
+        metric_text = f"Precision: {metric_value:.4f}"
+    elif metric == 'recall':
+        metric_value = recall_score(y_true, y_pred, average='weighted')
+        metric_text = f"Recall: {metric_value:.4f}"
+    elif metric == 'roc_auc' and len(classes) == 2:
         try:
-            # Only calculate ROC AUC for binary classification
-            roc_auc = roc_auc_score(y_true, y_pred)
-            metrics_text += f"\nROC AUC: {roc_auc:.4f}"
+            metric_value = roc_auc_score(y_true, y_pred)
+            metric_text = f"ROC AUC: {metric_value:.4f}"
         except:
-            pass
+            metric_value = accuracy_score(y_true, y_pred)
+            metric_text = f"Accuracy: {metric_value:.4f}"
+    else:
+        # Fall back to accuracy
+        metric_value = accuracy_score(y_true, y_pred)
+        metric_text = f"Accuracy: {metric_value:.4f}"
     
-    plt.figtext(0.02, 0.02, metrics_text, fontsize=10, 
-                bbox={"facecolor": "white", "alpha": 0.8, "pad": 5})
+    plt.figtext(0.02, 0.02, metric_text, fontsize=14, 
+                bbox={"facecolor": "white", "alpha": 0.9, "pad": 10, "edgecolor": "#cccccc"})
     
     plt.tight_layout()
     plt.savefig(output_path, bbox_inches='tight')
@@ -161,7 +247,8 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
             generate_confusion_matrix(
                 y_test, y_pred, 
                 confusion_path, 
-                title=f"Confusion Matrix - Fold {fold_idx}"
+                title=f"Confusion Matrix - Fold {fold_idx}",
+                metric=fold.get('metric', None)
             )
 
     # Convert lists to numpy arrays if needed
@@ -173,44 +260,86 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
         # Skip density plot creation for classification problems
         # Only create global confusion matrix for all folds combined
         confusion_path = os.path.join(output_dir, "confusion_matrix_global.png")
+
+        metric = None
+        if fold_results and len(fold_results) > 0:
+            metric = fold_results[0].get('metric', None)
+            
         generate_confusion_matrix(
             all_true_values_array, all_predictions_array,
             confusion_path,
-            title="Global Confusion Matrix (All Folds)"
+            title="Global Confusion Matrix (All Folds)",
+            metric=metric
         )
         # Skip the rest of the function for classification problems
-        # Save overall predictions vs. actual targets to a CSV (moved from below)
+        # Save overall predictions vs. actual targets to a CSV (
         csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
         
-        # Create main DataFrame with predictions
+        # Extract all sample data with fold information
+        all_ids = []
+        all_fold_indices = []
+        all_actual_values = []  # Recreate to match the fold indices order
+        all_predicted_values = []  # Recreate to match the fold indices order
+        
+        for fold_idx, fold in enumerate(fold_results):
+            fold_num = fold_idx + 1
+            
+            # Get IDs preferring original IDs if available
+            if 'original_ids' in fold and fold['original_ids'] is not None:
+                sample_ids = fold['original_ids']
+            elif 'ids_test' in fold and fold['ids_test'] is not None:
+                sample_ids = fold['ids_test']
+            else:
+                sample_ids = [f"Sample_{i+1}" for i in range(len(fold['y_test']))]
+            
+            # Get true values and predictions for this fold
+            y_true = fold['y_test']
+            y_pred = fold['y_pred']
+            
+            # Collect all data with fold information
+            for i in range(len(y_true)):
+                all_ids.append(sample_ids[i])
+                all_fold_indices.append(fold_num)
+                all_actual_values.append(y_true[i])
+                all_predicted_values.append(y_pred[i])
+        
+        # Create main DataFrame with predictions, IDs, and fold
         df = pd.DataFrame({
-            'actual': all_true_values,
-            'predicted': all_predictions
+            'ID': all_ids,
+            'Fold': all_fold_indices,
+            'Actual': all_actual_values,
+            'Predicted': all_predicted_values
+            # No 'Match' column for classification problems
         })
         
-        # Calculate percentage of predicted 0s and 1s for each actual class
-        # We'll include this directly in the main output file
-        # First, get unique actual values
-        unique_actual = np.unique(all_true_values_array)
+        # Get unique class values
+        unique_classes = np.unique(df['Actual'].values)
         
-        # For each sample, calculate counts and percentages for each actual class
-        counts_0s = {}
-        counts_1s = {}
-        pct_0s = {}
-        pct_1s = {}
-        for actual_val in unique_actual:
-            mask = np.array(all_true_values) == actual_val
-            preds_for_this_actual = np.array(all_predictions)[mask]
-            counts_0s[actual_val] = (preds_for_this_actual == 0).sum()
-            counts_1s[actual_val] = (preds_for_this_actual == 1).sum()
-            pct_0s[actual_val] = (preds_for_this_actual == 0).mean() * 100
-            pct_1s[actual_val] = (preds_for_this_actual == 1).mean() * 100
+        # Calculate global statistics instead of row-specific ones
+        class_stats = {}
+
+        # Get counts for each combination of actual and predicted classes
+        stats_df = pd.DataFrame()
         
-        # Add counts and percentages to each row based on its actual value
-        df['count_pred_0'] = [counts_0s[val] for val in df['actual']]
-        df['count_pred_1'] = [counts_1s[val] for val in df['actual']]
-        df['pct_pred_0'] = [pct_0s[val] for val in df['actual']]
-        df['pct_pred_1'] = [pct_1s[val] for val in df['actual']]
+        # Calculate stats for all samples combined
+        for actual_class in unique_classes:
+            # Calculate total for this actual class
+            actual_mask = df['Actual'] == actual_class
+            total_this_class = len(df.loc[actual_mask])
+            
+            # For each predicted class, calculate count and percentage
+            for pred_class in unique_classes:
+                pred_mask = df['Predicted'] == pred_class
+                # Count samples that match both conditions
+                count = len(df.loc[actual_mask & pred_mask])
+                # Calculate percentage
+                pct = (count / total_this_class) * 100 if total_this_class > 0 else 0
+                
+                # Add these stats as columns to the dataframe
+                col_name = f"count_{actual_class}_pred_{pred_class}"
+                pct_name = f"pct_{actual_class}_pred_{pred_class}"
+                df[col_name] = count
+                df[pct_name] = pct
         
         # Save to the single output file
         df.to_csv(csv_path, index=False)
@@ -225,12 +354,32 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
         plt.xlabel(f"{target_name} (Target Value)")
         plt.ylabel('Density')
         
-        # Add only the optimization metric (RMSE) for regression
+        # Get the user-selected metric for regression
         scores = evaluate_predictions(all_true_values_array, all_predictions_array)
-        metrics_text = f"RMSE: {scores['RMSE']:.7f}"
+        
+        # Get selected metric from any fold (should be the same for all)
+        metric = None
+        if fold_results and len(fold_results) > 0:
+            metric = fold_results[0].get('metric', None)
+        
+        if not metric:
+            metric = os.environ.get('DAFTAR-ML_METRIC', 'rmse').lower()
+        
+        # Display the selected metric
+        if metric.lower() == 'rmse':
+            metrics_text = f"RMSE: {scores['RMSE']:.7f}"
+        elif metric.lower() == 'mse':
+            metrics_text = f"MSE: {scores['MSE']:.7f}"
+        elif metric.lower() == 'mae':
+            metrics_text = f"MAE: {scores['MAE']:.7f}"
+        elif metric.lower() == 'r2':
+            metrics_text = f"R²: {scores['R2']:.7f}"
+        else:
+            # Default to RMSE if metric is not recognized
+            metrics_text = f"RMSE: {scores['RMSE']:.7f}"
         
         # Add small margin on the right side
-        plt.tight_layout(rect=[0, 0, 0.85, 1])  # Small horizontal padding
+        plt.tight_layout(rect=[0, 0, 0.85, 1])  
         
         # Simple text box with minimal styling
         plt.gca().text(1.02, 0.5, metrics_text, transform=plt.gca().transAxes,
@@ -261,21 +410,35 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
         'Predicted': all_predictions,
         'Actual': all_true_values
     })
-    # Calculate residuals using numpy arrays to avoid list subtraction
-    df_overall['Residual'] = np.array(df_overall['Predicted']) - np.array(df_overall['Actual'])
-    df_overall['Abs_Residual'] = np.abs(df_overall['Residual'])
     
-    # Calculate min and max predictions for each actual value
-    prediction_stats = df_overall.groupby('Actual')['Predicted'].agg(['min', 'max']).reset_index()
-    prediction_stats.columns = ['Actual', 'Min_Prediction', 'Max_Prediction']
+    # Determine if this is a regression problem based on problem_type or smart detection
+    if problem_type is None:
+        # Convert arrays to pandas Series for smart detection
+        y_true_series = pd.Series(all_true_values)
+        is_classification, detected_type = determine_task_type(y_true_series)
+        is_regression = not is_classification
+    else:
+        # Use the explicitly provided problem type
+        is_regression = problem_type.lower() == 'regression'
     
-    # For each row in df_overall, add the min and max prediction for its actual value
-    actual_to_min = dict(zip(prediction_stats['Actual'], prediction_stats['Min_Prediction']))
-    actual_to_max = dict(zip(prediction_stats['Actual'], prediction_stats['Max_Prediction']))
+    # Calculate residuals only for regression problems
+    if is_regression:  # Only for regression
+        df_overall['Residual'] = np.array(df_overall['Predicted']) - np.array(df_overall['Actual'])
+        df_overall['Abs_Residual'] = np.abs(df_overall['Residual'])
     
-    # Add min/max columns based on the actual value for each row
-    df_overall['min_pred'] = df_overall['Actual'].map(actual_to_min)
-    df_overall['max_pred'] = df_overall['Actual'].map(actual_to_max)
+    # Only calculate prediction stats for regression problems
+    if is_regression:  # Only for regression
+        # Calculate min and max predictions for each actual value
+        prediction_stats = df_overall.groupby('Actual')['Predicted'].agg(['min', 'max']).reset_index()
+        prediction_stats.columns = ['Actual', 'Min_Prediction', 'Max_Prediction']
+        
+        # For each row in df_overall, add the min and max prediction for its actual value
+        actual_to_min = dict(zip(prediction_stats['Actual'], prediction_stats['Min_Prediction']))
+        actual_to_max = dict(zip(prediction_stats['Actual'], prediction_stats['Max_Prediction']))
+        
+        # Add min/max columns based on the actual value for each row
+        df_overall['min_pred'] = df_overall['Actual'].map(actual_to_min)
+        df_overall['max_pred'] = df_overall['Actual'].map(actual_to_max)
     
     # Save the enhanced file (without creating additional files)
     df_overall.to_csv(csv_path, index=False)
@@ -330,7 +493,8 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             std = row["Std_MeanAcrossFolds"]
             f.write(f"{i}. {feature}\n")
             f.write(f"   {direction} prediction by {magnitude:.6f} (±{std:.6f})\n")
-            if 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
+            # Only show correlation information for regression problems
+            if config.problem_type == 'regression' and 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
                 f.write(f"   Correlation with target: {row['Target_Correlation']:.6f}\n")
             f.write("\n")
         
@@ -344,7 +508,8 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             std = row["Std_MeanAcrossFolds"]
             f.write(f"{i}. {feature}\n")
             f.write(f"   Increases prediction by {magnitude:.6f} (±{std:.6f})\n")
-            if 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
+            # Only show correlation information for regression problems
+            if config.problem_type == 'regression' and 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
                 f.write(f"   Correlation with target: {row['Target_Correlation']:.6f}\n")
             f.write("\n")
         
@@ -358,7 +523,8 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             std = row["Std_MeanAcrossFolds"]
             f.write(f"{i}. {feature}\n")
             f.write(f"   Decreases prediction by {magnitude:.6f} (±{std:.6f})\n")
-            if 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
+            # Only show correlation information for regression problems
+            if config.problem_type == 'regression' and 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
                 f.write(f"   Correlation with target: {row['Target_Correlation']:.6f}\n")
             f.write("\n")
         

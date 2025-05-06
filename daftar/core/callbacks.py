@@ -95,12 +95,20 @@ class RelativeEarlyStoppingCallback:
         
         # For minimization (default in Optuna)
         if study.direction == optuna.study.StudyDirection.MINIMIZE:
-            improvement = (self.best_value - current_value) / abs(self.best_value)
+            # Safe division to avoid division by zero
+            if abs(self.best_value) < 1e-10:  # Near zero
+                improvement = float('inf') if current_value < self.best_value else 0.0
+            else:
+                improvement = (self.best_value - current_value) / abs(self.best_value)
             is_better = current_value < self.best_value
             compare_symbol = '<'
         # For maximization
         else:
-            improvement = (current_value - self.best_value) / abs(self.best_value)
+            # Safe division to avoid division by zero
+            if abs(self.best_value) < 1e-10:  # Near zero
+                improvement = float('inf') if current_value > self.best_value else 0.0
+            else:
+                improvement = (current_value - self.best_value) / abs(self.best_value)
             is_better = current_value > self.best_value
             compare_symbol = '>'            
             
@@ -137,7 +145,8 @@ class RelativeEarlyStoppingCallback:
             if should_use_abs:
                 display_value = abs(current_value)
                 display_prev = abs(prev_value)
-                print(f"[Trial {current_trial_num}] New best: {fmt_metric(display_value)} {compare_symbol} {fmt_metric(display_prev)}, "
+                # For maximizing metrics, the comparison should be > not <
+                print(f"[Trial {current_trial_num}] New best: {fmt_metric(display_value)} > {fmt_metric(display_prev)}, "
                       f"patience counter reset = 0/{self.patience}")
             else:
                 print(f"[Trial {current_trial_num}] New best: {fmt_metric(current_value)} {compare_symbol} {fmt_metric(prev_value)}, "
@@ -150,7 +159,8 @@ class RelativeEarlyStoppingCallback:
                 if should_use_abs:
                     display_value = abs(current_value)
                     display_best = abs(self.best_value)
-                    print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(display_value)} {compare_symbol} {fmt_metric(display_best)}, "
+                    # For maximizing metrics, the comparison should always be >
+                    print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(display_value)} > {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
                 else:
                     print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(current_value)} {compare_symbol} {fmt_metric(self.best_value)}, "
@@ -159,11 +169,11 @@ class RelativeEarlyStoppingCallback:
                 # This trial is worse than the best so far
                 if should_use_abs:
                     display_trial = abs(trial.value)
-                    display_best = abs(current_value)
+                    display_best = abs(self.best_value)  # Should be best_value not current_value
                     print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(display_trial)}, Best = {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
                 else:
-                    print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(trial.value)}, Best = {fmt_metric(current_value)}, "
+                    print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(trial.value)}, Best = {fmt_metric(self.best_value)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
             
         # If we've exceeded patience, stop the optimization

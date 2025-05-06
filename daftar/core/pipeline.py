@@ -148,8 +148,11 @@ class Pipeline:
         if self.config.target not in data.columns:
             raise ValueError(f"Target column '{self.config.target}' not found in data")
         
+        # Store original data with IDs for later reference
         if self.config.id_column and self.config.id_column in data.columns:
-            # Remove ID column if present
+            # Make a copy of the original data with index set to match the dataset
+            self.original_data = data.copy().reset_index(drop=True)
+            # Remove ID column from working data
             data = data.drop(columns=[self.config.id_column])
         
         # Split features and target
@@ -341,7 +344,7 @@ class Pipeline:
         
         # Save Optuna visualizations
         if hasattr(model, 'study'):
-            save_optuna_visualizations(model.study, fold_idx, output_dir)
+            save_optuna_visualizations(model.study, fold_idx, output_dir, self.config)
         
         # Save the best model to the fold directory
         model_path = fold_dir / f"best_model_fold_{fold_idx}.pkl"
@@ -380,6 +383,7 @@ class Pipeline:
             'feature_importances': pd.Series(feature_importances, index=feature_names),
             'shap_values': shap_values,
             'metrics': metrics,
+            'metric': self.config.metric,  # Add selected metric from config
             'study': model.study if hasattr(model, 'study') else None,
             'shap_data': (shap_values, X_test_df, y_test)
         }
@@ -464,14 +468,6 @@ class Pipeline:
             all_true_values.extend(fold_result['y_test'].tolist() if isinstance(fold_result['y_test'], np.ndarray) else fold_result['y_test'])
             all_predictions.extend(fold_result['y_pred'])
             
-        # Prediction analysis plot
-        pred_path = output_dir / 'predictions.png'
-        create_prediction_analysis(
-            all_true_values,
-            all_predictions,
-            pred_path
-        )
-        output_files['predictions'] = str(pred_path)
         
         # SHAP analysis / visualization
         self.logger.info("Performing SHAP analysis (signed, focusing on positive/negative impact)...")
@@ -543,16 +539,19 @@ class Pipeline:
             output_dir: Output directory path
         """
         # Concatenate SHAP values from all folds
-        all_shap_values = []
-        all_feature_names = []
-        all_sample_ids = []
-        all_fold_indices = []
+        all_samples_shap_values = []
         
         for fold_idx, fold_result in enumerate(fold_results):
             shap_values = fold_result['shap_values']
             X_test = fold_result['X_test']
+            y_test = fold_result['y_test']
             feature_names = fold_result['feature_importances'].index.tolist()
-            sample_ids = fold_result['ids_test']
+            
+            # Use original IDs if available, otherwise use test IDs
+            if 'original_ids' in fold_result and fold_result['original_ids'] is not None:
+                sample_ids = fold_result['original_ids']
+            else:
+                sample_ids = fold_result['ids_test']
             
             # Skip if no SHAP values (shouldn't happen)
             if shap_values is None or len(shap_values) == 0:
@@ -564,27 +563,37 @@ class Pipeline:
                 # For multiclass, we'll just use the values for class 1 (positive class)
                 shap_values = shap_values[1]  # Select positive class SHAP values
             
-            # Convert to DataFrame
-            for i, sample_id in enumerate(sample_ids):
-                # Take one sample at a time
+            # Make sure we don't exceed the bounds of arrays
+            n_samples = min(len(shap_values), len(sample_ids), len(y_test))
+            
+            # For each sample, collect all feature SHAP values
+            for i in range(n_samples):
+                sample_id = sample_ids[i]
+                target_value = y_test[i]
                 sample_shap = shap_values[i]
                 
                 # Handle feature dimension safely
                 n_features = min(len(sample_shap), len(feature_names))
                 
-                for j in range(n_features):
-                    all_shap_values.append(sample_shap[j])
-                    all_feature_names.append(feature_names[j])
-                    all_sample_ids.append(sample_id)
-                    all_fold_indices.append(fold_idx + 1)  # 1-indexed folds
+                # Store all SHAP values for this sample
+                sample_shap_dict = {feature_names[j]: sample_shap[j] for j in range(n_features)}
+                
+                # Add metadata
+                sample_shap_dict['ID'] = sample_id  # Use a consistent ID column name
+                sample_shap_dict['Fold'] = fold_idx + 1  # 1-indexed folds
+                sample_shap_dict['Target'] = target_value  # Add target value
+                
+                # Append to the list of samples
+                all_samples_shap_values.append(sample_shap_dict)
         
-        # Create DataFrame
-        shap_df = pd.DataFrame({
-            'Fold': all_fold_indices,
-            'SampleID': all_sample_ids,
-            'Feature': all_feature_names,
-            'SHAP_Value': all_shap_values
-        })
+        # Create DataFrame with one row per sample, features as columns
+        shap_df = pd.DataFrame(all_samples_shap_values)
+        
+        # Reorder columns to put ID, Fold, and Target first
+        metadata_cols = ['ID', 'Fold', 'Target']
+        other_cols = [col for col in shap_df.columns if col not in metadata_cols]
+        ordered_cols = metadata_cols + other_cols
+        shap_df = shap_df[ordered_cols]
         
         # Save to CSV
         shap_df.to_csv(output_dir / 'shap_values_all_folds.csv', index=False)
@@ -596,6 +605,7 @@ class Pipeline:
             
             # Filter for this fold
             fold_shap_df = shap_df[shap_df['Fold'] == fold_idx + 1].copy()
+            # Use the same column ordering as the main SHAP CSV
             fold_shap_df.to_csv(fold_dir / f"shap_values_fold_{fold_idx+1}.csv", index=False)
     
     def _create_figures_explanation(self, output_dir: Path) -> None:
@@ -623,11 +633,7 @@ class Pipeline:
             "Features are ranked by their mean importance across all cross-validation folds.",
             "Error bars indicate the standard deviation of importance across folds.",
             "",
-            "3. Predictions Plot (predictions.png)",
-            "-" * 50,
-            "Left: Scatter plot of predicted vs. actual values. The red line represents perfect prediction.",
-            "Right: Residual plot showing the difference between predicted and actual values.",
-            "",
+
             "4. Global Density Plot (density_actual_vs_pred_global.png)",
             "-" * 50,
             "Distribution of actual vs. predicted values across all folds.",

@@ -127,11 +127,8 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         type=str,
         help="Metric to optimize (regression: mse/rmse/mae/r2, classification: accuracy/f1/roc_auc)"
     )
-    
-    # Transformations now handled in preprocessing stage
-    
+        
 
-    
     cv_args.add_argument(
         "--repeats",
         type=int,
@@ -195,16 +192,6 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     parsed_args, remaining = parser.parse_known_args(args)
         
     return parsed_args, remaining
-
-
-
-
-
-
-
-
-
-
 
 def main(args: Optional[List[str]] = None) -> int:
     """Main entry point for DAFTAR-ML CLI.
@@ -383,15 +370,22 @@ def main(args: Optional[List[str]] = None) -> int:
         cmd += f" --cores {config.cores}"
     if hasattr(config, 'metric') and config.metric is not None:
         cmd += f" --metric {config.metric}"
-    # trials parameter is not exposed in CLI, so don't include it in reproduction command
     if hasattr(config, 'patience') and config.patience is not None:
         cmd += f" --patience {config.patience}"
     if hasattr(config, 'relative_threshold') and config.relative_threshold != 1e-6:
         cmd += f" --threshold {config.relative_threshold}"
-    if hasattr(config, 'id_column') and config.id_column is not None and config.id_column != "ID":
+    if hasattr(config, 'id_column') and config.id_column is not None:
         cmd += f" --id {config.id_column}"
-    if hasattr(config, 'seed') and config.seed is not None:
+    # Always include the exact seed used in this run
+    # Get the seed from parsed_args to ensure we use the exact value provided by the user
+    if hasattr(parsed_args, 'seed'):
+        cmd += f" --seed {parsed_args.seed}"
+    elif hasattr(config, 'seed') and config.seed is not None:
         cmd += f" --seed {config.seed}"
+    
+    # Include the output_dir if it was specified
+    if hasattr(parsed_args, 'output_dir') and parsed_args.output_dir:
+        cmd += f" --output_dir {parsed_args.output_dir}"
     
     print(cmd)
     

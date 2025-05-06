@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Tuple
 
 
-def plot_feature_importance_bar(feature_importance_df, output_dir, top_n=25, bar_color="#968FF3", bar_opacity=1.0, bg_color="#E6E6E6"):
+def plot_feature_importance_bar(feature_importance_df, output_dir, top_n=25, bar_color="#968FF3", bar_opacity=1.0, bg_color="#F0F0F0"):
     """Create feature importance bar plot with error bars.
     
     Args:
@@ -32,38 +32,38 @@ def plot_feature_importance_bar(feature_importance_df, output_dir, top_n=25, bar
     # Reverse order for descending visualization (highest at top)
     df = df.iloc[::-1]
     
-    # Create figure and axes with custom background color
-    fig = plt.figure(figsize=(10, max(5, len(df) * 0.4)), facecolor=bg_color)
+    # Create figure with white/transparent background, but colored plot area
+    fig = plt.figure(figsize=(10, max(5, len(df) * 0.4)), facecolor='white')
     ax = plt.gca()
-    ax.set_facecolor(bg_color)
+    ax.set_facecolor(bg_color) 
     
     # First plot error bars (whiskers) behind the bars
     plt.errorbar(df["Mean"], range(len(df)), xerr=df["Std"],
-                 fmt='none', ecolor='darkgray', capsize=5, alpha=0.7, zorder=1)
+                 fmt='none', ecolor='black', capsize=5, alpha=0.7, zorder=1)
                  
     # Then plot the actual bars on top
     plt.barh(df.index, df["Mean"], color=bar_color, alpha=bar_opacity, zorder=2)
     
-    # Calculate the necessary width to contain all elements
-    max_val = max(df["Mean"])
-    max_std = max(df["Std"])
-    label_width = len(f"{max_val:.3f}") * 0.01 * max_val  # Estimate label width
+    # Adjust xlim to ensure we have space for labels
+    # Get current x limits
+    xmin, xmax = plt.xlim()
+    # Extend xmax to ensure we have enough space for labels
+    adjusted_xmax = max(df["Mean"]) * 1.3 + max(df["Std"]) * 2
+    plt.xlim(0, adjusted_xmax)
     
-    # Calculate total required width and set boundaries
-    required_width = max_val + max_std + label_width + (max_val * 0.05)  # Add 5% buffer
+    # Recalculate limits after adjustment
+    xmin, xmax = plt.xlim()
     
-    # Ensure we have enough space for everything
-    plt.xlim(0, required_width)
+    epsilon = (xmax - xmin) * 0.01
     
     # Position labels with consistent spacing after error bars
     for i, (v, std) in enumerate(zip(df["Mean"], df["Std"])):
-        # Position label just beyond the error bar with consistent small gap
-        x_text = v + std + (max_val * 0.01)  # Small buffer (1% of max value)
+        x_text = v + std + epsilon
         
         # Ensure label is inside plot boundaries
         plt.text(x_text, i,
                 f"{v:.3f}",
-                va="center", ha="left", fontsize=8,
+                va="center", ha="left", fontsize=9,
                 bbox=dict(facecolor="white", alpha=0.7, pad=1),
                 zorder=3)
     

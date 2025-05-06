@@ -76,8 +76,8 @@ def create_feature_importance(importances: np.ndarray,
     plt.close()
 
 
-def create_prediction_analysis(y_true: List[float],
-                             y_pred: List[float],
+def create_prediction_analysis(y_true: List,
+                             y_pred: List,
                              output_path: Path) -> None:
     """Create prediction analysis plots.
     
@@ -90,25 +90,49 @@ def create_prediction_analysis(y_true: List[float],
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
     
-    # Calculate residuals
-    residuals = y_pred - y_true
+    # Check if values are numeric or strings (for classification)
+    is_numeric = np.issubdtype(y_true.dtype, np.number) and np.issubdtype(y_pred.dtype, np.number)
     
-    # Create plot
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # Plot 1: Predicted vs. Actual
-    axes[0].scatter(y_true, y_pred, alpha=0.5)
-    axes[0].plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--')
-    axes[0].set_xlabel('Actual')
-    axes[0].set_ylabel('Predicted')
-    axes[0].set_title('Predicted vs. Actual')
-    
-    # Plot 2: Residuals
-    axes[1].scatter(y_true, residuals, alpha=0.5)
-    axes[1].axhline(y=0, color='r', linestyle='--')
-    axes[1].set_xlabel('Actual')
-    axes[1].set_ylabel('Residual (Predicted - Actual)')
-    axes[1].set_title('Residual Plot')
+    if is_numeric:
+        # For regression tasks
+        # Calculate residuals
+        residuals = y_pred - y_true
+        
+        # Create plot
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        
+        # Plot 1: Predicted vs. Actual
+        axes[0].scatter(y_true, y_pred, alpha=0.5)
+        axes[0].plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--')
+        axes[0].set_xlabel('Actual')
+        axes[0].set_ylabel('Predicted')
+        axes[0].set_title('Predicted vs. Actual')
+        
+        # Plot 2: Residuals
+        axes[1].scatter(y_true, residuals, alpha=0.5)
+        axes[1].axhline(y=0, color='r', linestyle='--')
+        axes[1].set_xlabel('Actual')
+        axes[1].set_ylabel('Residual (Predicted - Actual)')
+        axes[1].set_title('Residual Plot')
+    else:
+        # For classification tasks
+        from sklearn.metrics import confusion_matrix
+        
+        # Get unique classes
+        classes = np.unique(np.concatenate((y_true, y_pred)))
+        
+        # Create confusion matrix plot
+        cm = confusion_matrix(y_true, y_pred, labels=classes)
+        
+        # Single plot for classification
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Plot confusion matrix
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
+                   xticklabels=classes, yticklabels=classes, ax=ax)
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('True')
+        ax.set_title('Confusion Matrix - Overall Performance')
     
     plt.tight_layout()
     plt.savefig(output_path)
