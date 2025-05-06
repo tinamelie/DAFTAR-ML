@@ -271,6 +271,10 @@ Note: If you specify any of the CV parameters (outer, inner, repeats), you must 
 
 ##### Reports:
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_fold_report.txt`: Statistical assessment of fold quality with p-value tests
+  - For classification tasks: Chi-square test of independence comparing class distributions
+  - For regression tasks: Kolmogorov-Smirnov test comparing value distributions
+  - p-value ≥ 0.05 indicates train/test sets have similar distributions (good fold quality)
+  - p-value < 0.05 indicates statistically significant differences between train/test distributions (potential fold quality issue)
 
 #### Cross-Validation Guidelines
 

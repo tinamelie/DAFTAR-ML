@@ -669,6 +669,10 @@ def main() -> None:
         "=" * 80,
         "FOLD QUALITY ASSESSMENT",
         "=" * 80,
+        "",
+        f"[✓] p-value ≥ 0.05: Good fold balance ({('Chi-square' if is_cls else 'Kolmogorov-Smirnov')} test)",
+        f"[✗] p-value < 0.05: Potential fold imbalance",
+        "",
     ]
     for idx, (tr, te) in enumerate(outer_cv.split(y), start=1):
         tr_y, te_y = y.iloc[tr], y.iloc[te]
