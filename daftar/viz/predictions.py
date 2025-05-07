@@ -239,10 +239,12 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
         # Call with original IDs when available
         save_fold_predictions_vs_actual(fold_idx, ids_test, y_pred, y_test, output_dir, original_ids=original_ids)
         
+        # Create fold directory if it doesn't exist
+        fold_dir = os.path.join(output_dir, f"fold_{fold_idx}")
+        os.makedirs(fold_dir, exist_ok=True)
+        
         # Generate confusion matrix for classification problems (per fold)
         if problem_type == "classification":
-            fold_dir = os.path.join(output_dir, f"fold_{fold_idx}")
-            os.makedirs(fold_dir, exist_ok=True)
             confusion_path = os.path.join(fold_dir, f"confusion_matrix_fold_{fold_idx}.png")
             generate_confusion_matrix(
                 y_test, y_pred, 
@@ -250,27 +252,53 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
                 title=f"Confusion Matrix - Fold {fold_idx}",
                 metric=fold.get('metric', None)
             )
+        # Generate density plots for regression problems (per fold)
+        elif problem_type == "regression":
+            # Create per-fold density plot
+            plt.figure(figsize=(10, 6))
+            sns.kdeplot(y_test, label='Actual', fill=True, alpha=0.5, color='#00BFC4')
+            sns.kdeplot(y_pred, label='Predicted', fill=True, alpha=0.5, color='#F8766D')
+            plt.title(f"Density Plot - Fold {fold_idx}")
+            plt.xlabel(target_name)
+            plt.ylabel('Density')
+            plt.legend()
+            plt.grid(alpha=0.3)
+            
+            # Add evaluation metrics as text annotation if available
+            if 'metric_value' in fold and 'metric_name' in fold:
+                metric_name = fold['metric_name']
+                metric_value = fold['metric_value']
+                plt.annotate(f"{metric_name}: {metric_value:.4f}", 
+                             xy=(0.05, 0.95), xycoords='axes fraction',
+                             bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8))
+            
+            density_path = os.path.join(fold_dir, f"density_plot_fold_{fold_idx}.png")
+            plt.savefig(density_path, bbox_inches='tight')
+            plt.close()
+            print(f"Fold {fold_idx} density plot saved at {density_path}")
 
     # Convert lists to numpy arrays if needed
     all_true_values_array = np.array(all_true_values)
     all_predictions_array = np.array(all_predictions)
     
-    # Handle density plots differently for classification and regression
+    # Create global visualizations based on problem type
     if problem_type == "classification":
-        # Skip density plot creation for classification problems
-        # Only create global confusion matrix for all folds combined
+        # For classification, create a global confusion matrix for all folds combined
         confusion_path = os.path.join(output_dir, "confusion_matrix_global.png")
 
+        # Get the metric from the first fold (should be consistent across folds)
         metric = None
         if fold_results and len(fold_results) > 0:
             metric = fold_results[0].get('metric', None)
             
+        # Generate the global confusion matrix
         generate_confusion_matrix(
             all_true_values_array, all_predictions_array,
             confusion_path,
             title="Global Confusion Matrix (All Folds)",
             metric=metric
         )
+        print(f"Global confusion matrix saved at {confusion_path}")
         # Skip the rest of the function for classification problems
         # Save overall predictions vs. actual targets to a CSV (
         csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
