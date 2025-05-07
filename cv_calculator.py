@@ -7,8 +7,25 @@ from __future__ import annotations
 
 # Customizable visualization colors
 # Classification visualization colors
-CLASS_BAR_COLOR0 = "#1C0F13"          # Primary bar chart color for classification
-CLASS_BAR_COLOR1 = "#6E7E85"       # Secondary bar chart color for classification (alternating)
+
+# Binary classification colors (alternating)
+CLASS_BAR_COLOR0 = "#1C0F13"          # Primary bar chart color for binary classification
+CLASS_BAR_COLOR1 = "#6E7E85"          # Secondary bar chart color for binary classification
+
+# Multiclass classification colors (for more than 2 classes)
+# More distinctive colors for better differentiation
+MULTICLASS_COLORS = [
+    "#03045E",  
+    "#023E8A",    
+    "#0077B6",    
+    "#0096C7",    
+    "#00B4D8",    
+    "#48CAE4",    
+    "#90E0EF",    
+    "#ADE8F4",  
+    "#CAF0F8", 
+    "#316395"   
+]  # Add more colors as needed for more classes
 
 # Regression visualization colors
 REGRESSION_HIST_COLOR = "#1C0F13"       # Histogram fill color
@@ -287,12 +304,21 @@ def plot_hist_or_bar(
     """
     import matplotlib.patches as mpatches
     if classification:
-        # For classification, use alternating colors for the bars
+        # For classification, get the value counts and sort by index
         counts = series.value_counts().sort_index()
         class_values = counts.index.tolist()
+        num_classes = len(class_values)
         
-        # Use alternating colors for the bars
-        colors = [CLASS_BAR_COLOR0 if i % 2 == 0 else CLASS_BAR_COLOR1 for i in range(len(counts))]
+        # Choose colors based on number of classes
+        if num_classes <= 2:
+            # For binary classification, use alternating colors
+            colors = [CLASS_BAR_COLOR0 if i % 2 == 0 else CLASS_BAR_COLOR1 for i in range(num_classes)]
+        else:
+            # For multiclass, use the multiclass color palette
+            # If we have more classes than colors, we'll cycle through the available colors
+            colors = [MULTICLASS_COLORS[i % len(MULTICLASS_COLORS)] for i in range(num_classes)]
+            
+        # Create the bar chart
         bars = ax.bar(range(len(class_values)), counts.values, color=colors)
         
         # Set proper x-axis ticks and labels
@@ -306,7 +332,10 @@ def plot_hist_or_bar(
         patches = []
         labels = []
         for i, val in enumerate(class_values):
-            color = CLASS_BAR_COLOR0 if i % 2 == 0 else CLASS_BAR_COLOR1
+            if num_classes <= 2:
+                color = CLASS_BAR_COLOR0 if i % 2 == 0 else CLASS_BAR_COLOR1
+            else:
+                color = MULTICLASS_COLORS[i % len(MULTICLASS_COLORS)]
             patches.append(mpatches.Patch(color=color))
             labels.append(f"Class {val}")
             
@@ -587,31 +616,46 @@ def main() -> None:
     for rep in range(1, args.repeats + 1):
         report_lines.append(f"REPEAT {rep}/{args.repeats}")
         for fold in range(1, args.outer + 1):
+            # Calculate percentages
             tr_pct = 100 * (args.outer - 1) / args.outer
             te_pct = 100 / args.outer
+            
+            # Calculate actual sample counts
+            train_count = int(len(y) * tr_pct / 100)
+            test_count = len(y) - train_count
+            
             report_lines.append(f"  └─ OUTER FOLD {fold}/{args.outer}")
             report_lines.append(
-                f"       • Training:    {pct_bar(tr_pct)} ({tr_pct:.0f}%)"
+                f"       • Training:    {pct_bar(tr_pct)} ({tr_pct:.0f}%, {train_count} samples)"
             )
-            if fold == 1 and rep == 1:
-                report_lines.append(f"         └─ INNER CV ({args.inner} folds)")
+            # Show inner fold details for all folds in the first repeat
+            if rep == 1:
+                # Calculate inner fold percentages
                 in_tr_pct = tr_pct * (args.inner - 1) / args.inner
                 in_val_pct = tr_pct / args.inner
-                report_lines.append(
-                    f"            └─ INNER FOLD 1/{args.inner}"
-                )
-                report_lines.append(
-                    f"               • Training:   {pct_bar(in_tr_pct)} ({in_tr_pct:.0f}%)"
-                )
-                report_lines.append(
-                    f"               • Validation: {pct_bar(in_val_pct, char='▓')} ({in_val_pct:.0f}%)"
-                )
+                
+                # Calculate inner fold sample counts
+                inner_train_count = int(train_count * (args.inner - 1) / args.inner)
+                inner_val_count = train_count - inner_train_count
+                
+                # Show all inner folds
+                for inner_fold in range(1, args.inner + 1):
+                    report_lines.append(
+                        f"            └─ INNER FOLD {inner_fold}/{args.inner}"
+                    )
+                    report_lines.append(
+                        f"               • Training:   {pct_bar(in_tr_pct)} ({in_tr_pct:.0f}%, {inner_train_count} samples)"
+                    )
+                    report_lines.append(
+                        f"               • Validation: {pct_bar(in_val_pct, char='▓')} ({in_val_pct:.0f}%, {inner_val_count} samples)"
+                    )
             else:
+                # For subsequent repeats, just show a collapsed message
                 report_lines.append(
-                    f"         └─ INNER CV: {args.inner} folds (pattern identical to first fold)"
+                    f"            └─ INNER FOLDS: pattern identical to first repeat"
                 )
             report_lines.append(
-                f"       • Testing:     {pct_bar(te_pct, char='█')} ({te_pct:.0f}%)"
+                f"       • Testing:     {pct_bar(te_pct, char='█')} ({te_pct:.0f}%, {test_count} samples)"
             )
         report_lines.append("")
         
@@ -621,31 +665,40 @@ def main() -> None:
         if rep == 1:
             # For first repeat, show detailed first fold
             for fold in range(1, args.outer + 1):
+                # Calculate percentages
                 tr_pct = 100 * (args.outer - 1) / args.outer
                 te_pct = 100 / args.outer
+                
+                # Calculate actual sample counts
+                train_count = int(len(y) * tr_pct / 100)
+                test_count = len(y) - train_count
+                
                 console_lines.append(f"  └─ OUTER FOLD {fold}/{args.outer}")
                 console_lines.append(
-                    f"       • Training:    {pct_bar(tr_pct)} ({tr_pct:.0f}%)"
+                    f"       • Training:    {pct_bar(tr_pct)} ({tr_pct:.0f}%, {train_count} samples)"
                 )
-                if fold == 1:
-                    console_lines.append(f"         └─ INNER CV ({args.inner} folds)")
-                    in_tr_pct = tr_pct * (args.inner - 1) / args.inner
-                    in_val_pct = tr_pct / args.inner
+                # Always show inner fold details for all folds in the first repeat
+                # Calculate inner fold percentages
+                in_tr_pct = tr_pct * (args.inner - 1) / args.inner
+                in_val_pct = tr_pct / args.inner
+                
+                # Calculate inner fold sample counts
+                inner_train_count = int(train_count * (args.inner - 1) / args.inner)
+                inner_val_count = train_count - inner_train_count
+                
+                # Show all inner folds
+                for inner_fold in range(1, args.inner + 1):
                     console_lines.append(
-                        f"            └─ INNER FOLD 1/{args.inner}"
+                        f"            └─ INNER FOLD {inner_fold}/{args.inner}"
                     )
                     console_lines.append(
-                        f"               • Training:   {pct_bar(in_tr_pct)} ({in_tr_pct:.0f}%)"
+                        f"               • Training:   {pct_bar(in_tr_pct)} ({in_tr_pct:.0f}%, {inner_train_count} samples)"
                     )
                     console_lines.append(
-                        f"               • Validation: {pct_bar(in_val_pct, char='▓')} ({in_val_pct:.0f}%)"
-                    )
-                else:
-                    console_lines.append(
-                        f"         └─ INNER CV: {args.inner} folds (pattern identical to first fold)"
+                        f"               • Validation: {pct_bar(in_val_pct, char='▓')} ({in_val_pct:.0f}%, {inner_val_count} samples)"
                     )
                 console_lines.append(
-                    f"       • Testing:     {pct_bar(te_pct, char='█')} ({te_pct:.0f}%)"
+                    f"       • Testing:     {pct_bar(te_pct, char='█')} ({te_pct:.0f}%, {test_count} samples)"
                 )
         else:
             # For subsequent repeats, just show a collapsed message
