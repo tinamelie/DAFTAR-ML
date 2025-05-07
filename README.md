@@ -19,6 +19,8 @@ DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **
 
 ### Example dataset (comma‑separated .csv file):
 
+
+ ID column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Target column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
 | Species | **Growth_on_Galactose** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
 |----------|:---------------:|:-------------:|:-------------:|:-------------:|
 | Species1 |     **0.34**    |       10      |       0       |       15      |
@@ -55,21 +57,6 @@ daftar-cv --input preprocessed_data.csv --target TARGET --id ID --output_dir OUT
 ```
 daftar --input preprocessed_data.csv --target TARGET --id ID --model [xgb|rf] --output_dir OUTPUT_DIRECTORY
 ```
-
-### Model Selection Guide
-
-DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on your dataset characteristics:
-
-#### XGBoost (`--model xgb`): 
-  - Higher performance for complex data with sufficient samples (>100)
-  - Better with high-dimensional data and non-linear relationships
-  - May overfit on very small datasets
-
-#### Random Forest (`--model rf`):
-  - More robust for small datasets (<100 samples)
-  - Less prone to overfitting
-  - May not capture complex non-linear relationships as effectively
-
 ## Input Data
 
 DAFTAR-ML expects a comma-separated (.csv) matrix with the following columns:
@@ -88,6 +75,22 @@ Examples provided in [`test_data/`](test_data):
 * `Test_data_continuous.csv` – regression example with continuous targets
 
 Note: DAFTAR-ML supports multiclass classification as well (categorical targets with more than two values)
+
+## Model Selection Guide
+
+DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on your dataset characteristics:
+
+#### XGBoost (`--model xgb`): 
+  - Higher performance for complex data with sufficient samples (>100)
+  - Better with high-dimensional data and non-linear relationships
+  - May overfit on very small datasets
+
+#### Random Forest (`--model rf`):
+  - More robust for small datasets (<100 samples)
+  - Less prone to overfitting
+  - May not capture complex non-linear relationships as effectively
+
+
 
 ## Setup
 
