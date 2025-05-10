@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from daftar.viz.colors import (
+from daftar.viz.color_definitions import (
     DENSITY_ACTUAL_COLOR,
     DENSITY_PREDICTED_COLOR,
     DENSITY_ALPHA,

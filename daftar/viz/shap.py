@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
 from matplotlib.colors import LinearSegmentedColormap
-from daftar.viz.colors import (
+from daftar.viz.color_definitions import (
     SHAP_POSITIVE_COLOR,
     SHAP_NEGATIVE_COLOR,
     SHAP_BG_COLOR,

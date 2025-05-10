@@ -16,7 +16,7 @@ from sklearn.metrics import (
 )
 from scipy import stats
 
-from daftar.viz.colors import (
+from daftar.viz.color_definitions import (
     CONFUSION_MATRIX_CMAP,
     REGRESSION_MEAN_LINE_COLOR,
     DENSITY_ACTUAL_COLOR,

@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 
-from daftar.viz.colors import PLOT_CYCLE_COLORS
+from daftar.viz.color_definitions import PLOT_CYCLE_COLORS
 
 # Set common styling for all plots
 def set_plot_style():

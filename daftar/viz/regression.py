@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 
 from daftar.viz.common import set_plot_style, save_plot, create_subplots
-from daftar.viz.colors import REGRESSION_MEAN_LINE_COLOR
+from daftar.viz.color_definitions import REGRESSION_MEAN_LINE_COLOR
 
 
 def generate_density_plots(true_values, predictions, output_path, target_name, metric=None):

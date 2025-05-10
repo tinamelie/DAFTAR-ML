@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
 
-from daftar.viz.colors import CONFUSION_MATRIX_CMAP, REGRESSION_MEAN_LINE_COLOR
+from daftar.viz.color_definitions import CONFUSION_MATRIX_CMAP, REGRESSION_MEAN_LINE_COLOR
 
 
 def create_shap_summary(shap_values: List[np.ndarray], 

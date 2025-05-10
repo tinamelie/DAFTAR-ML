@@ -12,7 +12,7 @@ import seaborn as sns
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Tuple
 
-from daftar.viz.colors import FEATURE_IMPORTANCE_BAR_COLOR, FEATURE_IMPORTANCE_BAR_BG
+from daftar.viz.color_definitions import FEATURE_IMPORTANCE_BAR_COLOR, FEATURE_IMPORTANCE_BAR_BG
 
 
 def process_sample_importances(sample_importances):

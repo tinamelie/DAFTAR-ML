@@ -41,7 +41,8 @@ from daftar.viz.optuna import save_optuna_visualizations
 from daftar.viz.shap import save_mean_shap_analysis
 from daftar.viz.feature_importance import plot_feature_importance_bar, save_feature_importance_values
 from daftar.viz.predictions import generate_density_plots, save_fold_predictions_vs_actual, save_top_features_summary
-from daftar.viz.colors import FEATURE_IMPORTANCE_BAR_COLOR, FEATURE_IMPORTANCE_BAR_BG
+from daftar.viz.color_definitions import FEATURE_IMPORTANCE_BAR_COLOR, FEATURE_IMPORTANCE_BAR_BG
+from daftar.viz.color_definitions import get_train_test_colors
 
 
 class Pipeline:
@@ -339,7 +340,7 @@ class Pipeline:
             feature_importances = np.zeros(len(feature_names))
         
         # Get SHAP values if model supports it
-            shap_values = None
+        shap_values = None
         if hasattr(model, 'shap_values'):
             try:
                 # Create DataFrame for SHAP values calculation (for better visualization)
@@ -429,7 +430,6 @@ class Pipeline:
         plt.figure(figsize=(10, 6))
         
         # Get colors for train/test from the central color management
-        from daftar.viz.colors import get_train_test_colors
         colors = get_train_test_colors()
         
         if is_classification:

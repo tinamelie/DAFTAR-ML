@@ -20,8 +20,8 @@ import matplotlib.patches as mpatches
 import inspect
 import matplotlib.cm as cm
 
-# Direct import from colors.py file
-from daftar.viz.colors import (
+# Direct import from color_definitions.py file
+from daftar.viz.color_definitions import (
     BINARY_CLASSIFICATION_COLORS,
     REGRESSION_COLOR,
     REGRESSION_HIST_COLOR,
@@ -247,8 +247,8 @@ def get_colors_path():
         Path to the colors.py file
     """
     # Get the file path of the colors module
-    import daftar.viz.colors
-    colors_path = inspect.getfile(daftar.viz.colors)
+    import daftar.viz.color_definitions
+    colors_path = inspect.getfile(daftar.viz.color_definitions)
     return colors_path
 
 

@@ -19,7 +19,7 @@ import seaborn as sns
 from scipy import stats
 from sklearn.model_selection import KFold, RepeatedKFold, StratifiedKFold, RepeatedStratifiedKFold
 
-from daftar.viz.colors import get_color_palette, get_train_test_colors
+from daftar.viz.color_definitions import get_color_palette, get_train_test_colors
 
 
 # Visualization helpers

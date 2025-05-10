@@ -54,13 +54,7 @@ daftar-preprocess --input data.csv --target target_column --id sample_id --outpu
 daftar-cv --input preprocessed_data.csv --target target_column --id sample_id --output_dir output_directory
 ```
 
-### 3. Visualize color palettes (optional)
-```bash
-daftar-colors --output_dir output_directory
-```
-This tool displays all color palettes used in DAFTAR-ML visualizations, including train/test colors, density plots, and confusion matrix colormaps. Use this to ensure consistent color schemes in your custom visualizations or publications.
-
-### 4. Run the main pipeline
+### 3. Run the main pipeline
 ```
 daftar --input preprocessed_data.csv --target target_column --id sample_id --model [xgb|rf] --output_dir output_directory
 ```
@@ -175,6 +169,7 @@ daftar/                   # Main library package
 │   ├── classification.py    # Classification visualizations
 │   ├── shap.py              # SHAP visualizations (simplified)
 │   ├── feature_importance.py # Feature importance visualizations
+│   ├── color_definitions.py  # Centralized color definitions
 │   └── optuna.py            # Hyperparameter tuning visualizations
 ├── utils/                   # General utilities
 │   ├── __init__.py
@@ -185,6 +180,7 @@ daftar/                   # Main library package
 │   ├── __init__.py
 │   ├── preprocess.py        # Preprocessing script
 │   ├── cv_calculator.py     # CV calculation script
+│   ├── colors.py            # Color visualization tool
 │   └── run_daftar.py        # Main entry point script
 └── cli.py                   # Command-line interface
 
@@ -272,7 +268,7 @@ This tool generates visual and statistical analysis of your dataset splits inclu
 - Target distribution visualizations across all folds with automatically optimized bin sizes
 - Statistical validation of fold quality using p-value tests
 - CSV exports of sample assignments to train/validation/test sets
-- Fold-by-fold breakdown reports
+- Fold-by-fold breakdown reports with train/test distribution histograms
 
 Note: This does not produce any modified or processed data from your input. This is simply a tool to help you select your parameters. It can be skipped if you already have a configuration in mind, have balanced classes/distributions, or prefer the defaults.
 
@@ -312,10 +308,12 @@ Note: If you specify any of the CV parameters (outer, inner, repeats), you must 
 ##### CSV Exports:
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_splits_basic.csv`: Simple dataset showing sample assignments to train/test for each outer fold
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_splits_granular.csv`: Detailed dataset showing all sample assignments across all folds and repeats
+* `fold_[N]_samples.csv`: Per-fold CSV file listing all samples with their ID, target value, and assignment (Train/Test)
 
 ##### Visualizations:
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_overall_distribution.png/pdf`: Histogram/density plot of the overall target distribution with automatically optimized bin sizes
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_histograms.png/pdf`: Multi-panel visualization comparing train/test distributions for each fold with automatically optimized bin sizes
+* `fold_[N]_distribution.png`: Individual fold histograms showing train/test distribution for each fold
 
 ##### Reports:
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_fold_report.txt`: Statistical assessment of fold quality with p-value tests
@@ -386,7 +384,9 @@ daftar --input preprocessed_data.csv --target target_column --id id_column --mod
 
 ## Results and Output Explanation
 
-Each run creates a folder inside the current directory (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`):
+Each run creates a folder inside the current directory (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`).
+
+### Output Structure Overview
 
 ```
 results/
@@ -398,107 +398,89 @@ results/
     │   ├── feature_importance_values_sample.csv # Sample-level feature importance 
     │   ├── feature_importance_bar_fold.png    # Fold-level importance visualization
     │   └── feature_importance_bar_sample.png  # Sample-level importance visualization
-    ├── shap_beeswarm_sample.png              # SHAP distribution by sample-level impact
-    ├── shap_beeswarm_fold.png                # SHAP distribution by fold-level consistency
-    ├── shap_bar_sample.png                   # Top features by sample-level impact
-    ├── shap_bar_fold.png                     # Top features by fold-level impact
-    ├── shap_corr_bar_sample.png              # Target correlations by sample (regression)
-    ├── shap_corr_bar_fold.png                # Target correlations by fold (regression)
+    ├── shap_*.png                            # SHAP summary visualizations
     ├── shap_feature_metrics.csv              # Feature statistics with both calculation methods
     ├── shap_features_summary.txt             # Comprehensive feature analysis and rankings
+    ├── shap_values_all_folds.csv             # Combined SHAP values from all folds
     ├── predictions_vs_actual_overall.csv     # Combined predictions from all folds
     ├── density_actual_vs_pred_global.png     # Regression density plot
     ├── figures_explanation.txt               # Detailed explanation of all output files
-    ├── fold_1/ … fold_N/                     # Individual fold files
-    │   ├── best_model_fold_N.pkl              # Trained model for this fold
-    │   ├── confusion_matrix_fold_N.png        # Confusion matrix for this fold
-    │   ├── feature_importance_fold_N.csv      # Feature importance for this fold
-    │   ├── predictions_vs_actual_fold_N.csv   # Predictions for this fold
-    │   ├── shap_values_fold_N.csv             # SHAP values for this fold
-    │   └── optuna_plots/                      # Hyperparameter tuning visualizations
-    └── shap_values_all_folds.csv             # Combined SHAP values from all folds
+    ├── fold_1/ … fold_N/                     # Individual fold directories (described below)
 ```
 
-### Main Output Files
+### Global Output Files
 
 #### Performance Metrics:
-* `performance.txt`: Summary of model performance metrics
-* `metrics.json`: Detailed performance metrics in JSON format
+* `metrics_overall.csv`: Summary of model performance metrics across all folds
+* `performance.txt`: Human-readable summary of model performance
 
+#### SHAP Analysis Files:
+* `shap_beeswarm_sample.png` & `shap_beeswarm_fold.png`: SHAP value distribution visualizations
+* `shap_bar_sample.png` & `shap_bar_fold.png`: Top 25 positive/negative impact features
+* `shap_corr_bar_sample.png` & `shap_corr_bar_fold.png`: Target correlations (regression only)
+* `shap_feature_metrics.csv`: Statistical summary of feature impact
+* `shap_features_summary.txt`: Comprehensive feature analysis and rankings
+* `shap_values_all_folds.csv`: Combined SHAP values from all folds
 
-##### SHAP Analysis (recommended for reporting):
-  * **Understanding Sample vs. Fold Methods:**
-    * **Sample-level calculations**: Based on raw SHAP values across all samples combined, identifies features with strongest overall impact regardless of fold structure
-      * Advantages: Captures the full feature impact across the entire dataset
-      * Limitations: May be influenced by outliers or specific data contexts
-    * **Fold-level calculations**: First calculates mean SHAP values within each fold, then averages these means across folds
-      * Advantages: More robust to outliers and better identifies consistently important features
-      * Limitations: May undervalue features that are important in specific contexts only
+#### Feature Importance Analysis:
+* `feature_importance/feature_importance_values_fold.csv`: Fold-level importance
+* `feature_importance/feature_importance_values_sample.csv`: Sample-level importance
+* `feature_importance/feature_importance_bar_fold.png`: Bar plot of fold-level importance
+* `feature_importance/feature_importance_bar_sample.png`: Bar plot of sample-level importance
 
-  * **Interpreting Differences Between Rankings:**
-    * Features ranking higher in sample-level files: Strong but context-dependent effects that may vary between folds
-    * Features ranking higher in fold-level files: More consistent effects across different data splits (more reliable)
-    * Features high in both calculation methods: Most reliable features with strong, consistent impact across all contexts
+#### Predictions and Evaluation:
+* `predictions_vs_actual_overall.csv`: Combined predictions across all folds
+* `confusion_matrix_global.png`: Overall confusion matrix (classification)
+* `density_actual_vs_pred_global.png`: Distribution of predictions vs actual (regression)
 
-  * **Visualizations:**
-    * `shap_beeswarm_sample.png` & `shap_beeswarm_fold.png`: SHAP value distribution for all features, colored by feature value
-    * `shap_bar_sample.png` & `shap_bar_fold.png`: Top 25 positive/negative impact features (fold version includes cross-validation error bars)
-    * Regression only:
-      * `shap_corr_bar_sample.png` & `shap_corr_bar_fold.png`: These plots show the correlation between feature SHAP values and the target variable (regression only)
-        * What they measure: For each feature, how consistently do its SHAP values align with the target values?
-        * Interpretation:
-          * Red bars (positive correlation): Features where higher values consistently contribute to higher predictions
-          * Blue bars (negative correlation): Features where higher values consistently contribute to lower predictions
-          * Sample version uses all samples together; fold version calculates per fold then averages (more robust)
+#### Documentation:
+* `DAFTAR-ML_run.log`: Complete run log with all console output
+* `figures_explanation.txt`: Detailed explanations of all output visualizations
+* `config.json`: Record of all settings used in the analysis
 
-* **Results Files:**
-  * `shap_values_raw.csv`: Contains individual SHAP values for each test sample and feature (large matrix with samples as rows, features as columns)
-  * `shap_feature_metrics.csv`: Statistical summary of feature impact using both sample-level and fold-level calculations, includes mean impact, standard deviation, and direction
-  * `shap_features_summary.txt`: Comprehensive textual summary showing top features by each ranking method, with detailed explanations of positive/negative impact and feature rankings by different methodologies
-  * `shap_values_all_folds.csv`: Aggregated SHAP values organized by feature and fold for cross-validation analysis
+### Per-Fold Output Files
 
-> **Note:** SHAP values provide more reliable feature impact analysis than traditional importance rankings.
+Each fold directory (`fold_N/`) contains fold-specific outputs:
 
-#### Feature Analysis:
+#### Model Files:
+* `best_model_fold_N.pkl`: Trained model for this fold
+* `test_indices_fold_N.csv`: Sample indices used in test set
 
-##### Model-Specific Feature Importance:
-* Feature importance directory (`feature_importance/`): Contains both fold-level and sample-level versions
-  * `feature_importance_values_fold.csv`: Fold-level importance (importance values are averaged within each fold first, then across folds)
-  * `feature_importance_values_sample.csv`: Sample-level importance (raw importance values from all samples combined, then averaged)
-  * `feature_importance_bar_fold.png`: Bar plot of top features by fold-level importance (more robust to outliers)
-  * `feature_importance_bar_sample.png`: Bar plot of top features by sample-level importance (captures full dataset impact)
+#### Predictions & Sample Information:
+* `predictions_vs_actual_fold_N.csv`: Test set predictions for this fold
+* `fold_N_samples.csv`: List of samples with ID, target value and set (Train/Test)
 
+#### Analysis Files:
+* `fold_N_distribution.png`: Train/test target distribution histogram
+* `confusion_matrix_fold_N.png`: Confusion matrix (classification)
+* `shap_values_fold_N.csv`: SHAP values for this fold
+* `feature_importance_fold_N.csv`: Feature importance rankings
 
-> **Note:** We recommend reporting SHAP results rather than feature importance rankings. SHAP values provide more reliable feature impact analysis with both magnitude and directionality information.
+#### Hyperparameter Tuning:
+* `optuna_trials_fold_N.csv`: All hyperparameter combinations tested
+* `optuna_importance_fold_N.png`: Parameter importance visualization
+* `optuna_parallel_coordinate_fold_N.png`: Parallel coordinates plot
 
-#### Predictions:
-* `predictions_vs_actual_overall.csv`: Combined predictions from all folds (with Correct column for classification tasks, residuals for regression)
-* `confusion_matrix_global.png`: Overall confusion matrix (classification only)
-* `density_actual_vs_pred_global.png`: Distribution of predictions vs actual values (regression only)
+### Understanding SHAP Analysis
 
-#### Logging and Documentation:
-* `DAFTAR-ML_run.log`: Combined console and file log of the entire run
-* `figures_explanation.txt`: Comprehensive descriptions of each visualization output
-* `config.json`: Complete record of all settings used for the analysis
+SHAP values provide more reliable feature impact analysis than traditional importance rankings.
 
-### Per-Fold Results
+* **Sample-level calculations**: Based on raw SHAP values across all samples combined
+  * Advantages: Captures full feature impact across the entire dataset
+  * Limitations: May be influenced by outliers or specific data contexts
 
-Each `fold_N` directory contains:
+* **Fold-level calculations**: First calculates mean SHAP values within each fold, then averages across folds
+  * Advantages: More robust to outliers and better identifies consistently important features
+  * Limitations: May undervalue features that are important in specific contexts only
 
-* **Model Files:**
-  * `best_model_fold_N.pkl`: Trained model for this fold
-  * `predictions_fold_N.csv`: Test set predictions for this fold
-  * `test_indices_fold_N.csv`: Sample indices used in test set
+**Interpreting Differences Between Rankings:**
+* Features ranking higher in sample-level files: Strong but context-dependent effects
+* Features ranking higher in fold-level files: More consistent effects (more reliable)
+* Features high in both calculation methods: Most reliable features with strong, consistent impact
 
-* **Evaluation:**
-  * `shap_values_fold_N.csv`: SHAP values specific to this fold
-  * `metrics_fold_N.json`: Performance metrics for this fold
-  * Fold-specific versions of global visualizations
-
-* **Hyperparameter Tuning:**
-  * `optuna_trials_fold_N.csv`: All hyperparameter combinations tested
-  * `optuna_importance_fold_N.png`: Parameter importance plot
-  * `optuna_parallel_coordinate_fold_N.png`: Parallel coordinates visualization
+For regression problems, correlation plots show the relationship between feature SHAP values and the target variable:
+* Red bars (positive correlation): Features where higher values contribute to higher predictions
+* Blue bars (negative correlation): Features where higher values contribute to lower predictions
 
 ### Performance Evaluation Metrics
 
@@ -510,6 +492,7 @@ DAFTAR-ML supports various metrics for evaluating model performance:
   _Default threshold value_: 1e-3
 
 These thresholds determine when to stop hyperparameter optimization. You can customize them with the `--threshold` parameter.
+
 ## Advanced Features
 
 ### YAML Configuration (optional)
@@ -542,6 +525,16 @@ Anything specified on the CLI will override YAML values.
 * All random generators (NumPy, scikit-learn, XGBoost, Optuna) are seeded with `--seed`.
 * All settings and parameters used in your run are saved in `config.json` in the output directory, making it easy to reproduce results later.
 
+### Color Visualization Tool
+
+DAFTAR-ML includes a utility to display all the color palettes used in its visualizations. 
+
+```bash
+daftar-colors --output_dir output_directory
+```
+
+All DAFTAR-ML visualizations use a centralized color management system (in `daftar/viz/colors.py`) to ensure consistent styling across all outputs.
+
 ## Citing DAFTAR-ML
 
 If you use DAFTAR-ML in academic work, please cite:
@@ -558,4 +551,4 @@ If you use DAFTAR-ML in academic work, please cite:
 
 ---
 
-For questions, feature requests or bug reports please open an issue on GitHub. 
+For questions, feature requests or bug reports please open an issue on GitHub.

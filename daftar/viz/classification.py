@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Tuple, Optional
 
 from daftar.viz.common import set_plot_style, save_plot, create_subplots
 from sklearn.metrics import confusion_matrix, roc_curve, auc
-from daftar.viz.colors import CONFUSION_MATRIX_CMAP
+from daftar.viz.color_definitions import CONFUSION_MATRIX_CMAP
 
 
 def generate_confusion_matrix(true_values, predictions, output_path, title="Confusion Matrix", metric=None):
