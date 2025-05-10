@@ -5,58 +5,52 @@ Nested CV target-distribution visualiser.
 
 from __future__ import annotations
 
-# Customizable visualization colors
-# Classification visualization colors
-
-# Binary classification colors (alternating)
-CLASS_BAR_COLOR0 = "#1C0F13"          # Primary bar chart color for binary classification
-CLASS_BAR_COLOR1 = "#6E7E85"          # Secondary bar chart color for binary classification
-
-# Multiclass classification colors (for more than 2 classes)
-# More distinctive colors for better differentiation
-MULTICLASS_COLORS = [
-    "#03045E",  
-    "#023E8A",    
-    "#0077B6",    
-    "#0096C7",    
-    "#00B4D8",    
-    "#48CAE4",    
-    "#90E0EF",    
-    "#ADE8F4",  
-    "#CAF0F8", 
-    "#316395"   
-]  # Add more colors as needed for more classes
-
-# Regression visualization colors
-REGRESSION_HIST_COLOR = "#1C0F13"       # Histogram fill color
-REGRESSION_HIST_ALPHA = 0.8          # Histogram transparency
-REGRESSION_MEAN_LINE_COLOR = "r"     # Mean line color
-
-# Compare train/test visualization colors
-TRAIN_HIST_COLOR = "#70e4ef"            # Train set histogram color
-TEST_HIST_COLOR = "#dfdf20"           # Test set histogram color 
-HIST_ALPHA = 0.8                     # Transparency for compare histograms
-
 import argparse
 import math
 import os
 import sys
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable, List, Optional, Tuple, Dict, Union, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
-from sklearn.model_selection import KFold, RepeatedKFold
+from sklearn.model_selection import KFold, RepeatedKFold, StratifiedKFold, RepeatedStratifiedKFold
 
-# Global state (computed once in main())
-_IS_CLASSIFICATION: bool | None = None
-_TASK_TYPE: str | None = None        # "classification" | "regression"
+from daftar.viz.colors import get_color_palette, get_train_test_colors
 
 
-# Utilities
+# Visualization helpers
+def calculate_optimal_bins(data: pd.Series, max_bins: int = 50) -> int:
+    """Calculate optimal number of bins using Freedman-Diaconis rule.
+    
+    Args:
+        data: Data series to calculate bins for
+        max_bins: Maximum number of bins to return
+        
+    Returns:
+        Optimal number of bins
+    """
+    n = len(data)
+    if n <= 1:
+        return 10
+        
+    iqr = np.percentile(data, 75) - np.percentile(data, 25)
+    if iqr <= 0:
+        return 10
+        
+    bin_width = 2 * iqr / (n ** (1/3))
+    data_range = data.max() - data.min()
+    
+    if data_range <= 0 or bin_width <= 0:
+        return 10
+        
+    bins = max(int(np.ceil(data_range / bin_width)), 5)
+    return min(bins, max_bins)
+
+
 def determine_task_type(y: pd.Series) -> Tuple[bool, str]:
     """
     Decide if *y* is classification or regression.
@@ -88,24 +82,10 @@ def determine_task_type(y: pd.Series) -> Tuple[bool, str]:
     if pd.api.types.is_integer_dtype(y):
         min_val, max_val = y.min(), y.max()
         # If all values are integers in a small range and there aren't too many unique values
-        if 0 <= min_val and max_val <= 3 and len(unique_values) <= (max_val - min_val + 1):
+        if 0 <= min_val and max_val <= 10 and len(unique_values) <= (max_val - min_val + 1):
             return True, "classification"
         
     return False, "regression"
-
-
-def set_task_type(y: pd.Series) -> Tuple[bool, str]:
-    """Initialise global flags exactly once.
-    
-    Args:
-        y: Target variable Series
-        
-    Returns:
-        Tuple of (is_classification, task_type_string)
-    """
-    global _IS_CLASSIFICATION, _TASK_TYPE
-    _IS_CLASSIFICATION, _TASK_TYPE = determine_task_type(y)
-    return _IS_CLASSIFICATION, _TASK_TYPE
 
 
 def pct_bar(pct: float, full_len: int = 50, char: str = "▒") -> str:
@@ -123,9 +103,46 @@ def pct_bar(pct: float, full_len: int = 50, char: str = "▒") -> str:
     return char * filled
 
 
+def get_cv_splitter(task_type: str, n_splits: int, n_repeats: int, use_stratification: bool = True, random_state: Optional[int] = None) -> Union[RepeatedKFold, RepeatedStratifiedKFold]:
+    """Get appropriate CV splitter based on task type.
+    
+    Args:
+        task_type: "classification" or "regression"
+        n_splits: Number of splits for CV
+        n_repeats: Number of repeats for CV
+        use_stratification: Whether to use stratification for classification tasks
+        random_state: Random seed for reproducibility
+        
+    Returns:
+        CV splitter object
+    """
+    if task_type == "classification" and use_stratification:
+        return RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+    else:
+        return RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+
+
+def get_inner_cv_splitter(task_type: str, n_splits: int, use_stratification: bool = True, random_state: Optional[int] = None) -> Union[KFold, StratifiedKFold]:
+    """Get appropriate inner CV splitter based on task type.
+    
+    Args:
+        task_type: "classification" or "regression"
+        n_splits: Number of splits for CV
+        use_stratification: Whether to use stratification for classification tasks
+        random_state: Random seed for reproducibility
+        
+    Returns:
+        CV splitter object
+    """
+    if task_type == "classification" and use_stratification:
+        return StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    else:
+        return KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+
 # Split-helper routines
 def _outer_splits(
-    cv: RepeatedKFold | KFold,
+    cv: Union[RepeatedKFold, RepeatedStratifiedKFold],
     y: pd.Series,
     repeats: int,
 ) -> Iterable[Tuple[int, int, np.ndarray, np.ndarray]]:
@@ -143,7 +160,7 @@ def _outer_splits(
         Tuples of (repeat_number, fold_number, train_indices, test_indices)
     """
     n_per_repeat = cv.get_n_splits() // repeats
-    for split_no, (tr, te) in enumerate(cv.split(y), start=1):
+    for split_no, (tr, te) in enumerate(cv.split(np.zeros(len(y)), y), start=1):
         rep = (split_no - 1) // n_per_repeat + 1
         fold = (split_no - 1) % n_per_repeat + 1
         yield rep, fold, tr, te
@@ -198,10 +215,12 @@ def save_splits_csv(
 def build_split_rows(
     ids: pd.Series,
     y: pd.Series,
-    outer_cv: RepeatedKFold,
+    outer_cv: Union[RepeatedKFold, RepeatedStratifiedKFold],
     repeats: int,
-    inner_folds: int | None = None,
-    seed: int | None = None,
+    inner_folds: Optional[int] = None,
+    seed: Optional[int] = None,
+    task_type: str = "regression",
+    use_stratification: bool = True,
 ) -> Tuple[list[dict], list[dict]]:
     """Build data structures for CV splits.
     
@@ -212,6 +231,8 @@ def build_split_rows(
         repeats: Number of repeats
         inner_folds: Number of inner folds (None for no inner CV)
         seed: Random seed for reproducibility
+        task_type: "classification" or "regression"
+        use_stratification: Whether to use stratification for classification
         
     Returns:
         Tuple of (basic_rows, granular_rows) for CSV output
@@ -219,11 +240,9 @@ def build_split_rows(
     basic_rows: list[dict] = []
     granular_rows: list[dict] = []
 
-    inner_cv = (
-        None
-        if inner_folds is None
-        else KFold(n_splits=inner_folds, shuffle=True, random_state=seed)
-    )
+    inner_cv = None
+    if inner_folds is not None:
+        inner_cv = get_inner_cv_splitter(task_type, inner_folds, use_stratification, seed)
 
     for rep, fold, tr_idx, te_idx in _outer_splits(outer_cv, y, repeats):
         # Basic (outer only)
@@ -255,7 +274,11 @@ def build_split_rows(
         if inner_cv is None:
             continue
 
-        for inner_no, (in_tr, in_val) in enumerate(inner_cv.split(tr_idx), start=1):
+        # Use appropriate inner split method based on task type
+        X_dummy = np.zeros(len(tr_idx))
+        y_inner = y.iloc[tr_idx]
+        
+        for inner_no, (in_tr, in_val) in enumerate(inner_cv.split(X_dummy, y_inner), start=1):
             tr_orig = tr_idx[in_tr]
             val_orig = tr_idx[in_val]
 
@@ -285,13 +308,12 @@ def build_split_rows(
     return basic_rows, granular_rows
 
 
-# Visualization helpers
 def plot_hist_or_bar(
     series: pd.Series,
     ax: plt.Axes,
     title: str,
-    classification: bool,
-    bins: int = None,
+    is_classification: bool,
+    bins: Optional[int] = None,
 ) -> None:
     """Draw a histogram (regression) or bar chart (classification).
     
@@ -299,27 +321,21 @@ def plot_hist_or_bar(
         series: Data series to plot
         ax: Matplotlib axes to draw on
         title: Plot title
-        classification: Whether to use a bar chart (True) or histogram (False)
+        is_classification: Whether to use a bar chart (True) or histogram (False)
         bins: Number of bins for histogram (regression only)
     """
     import matplotlib.patches as mpatches
-    if classification:
+    if is_classification:
         # For classification, get the value counts and sort by index
         counts = series.value_counts().sort_index()
         class_values = counts.index.tolist()
         num_classes = len(class_values)
         
-        # Choose colors based on number of classes
-        if num_classes <= 2:
-            # For binary classification, use alternating colors
-            colors = [CLASS_BAR_COLOR0 if i % 2 == 0 else CLASS_BAR_COLOR1 for i in range(num_classes)]
-        else:
-            # For multiclass, use the multiclass color palette
-            # If we have more classes than colors, we'll cycle through the available colors
-            colors = [MULTICLASS_COLORS[i % len(MULTICLASS_COLORS)] for i in range(num_classes)]
-            
+        # Get appropriate color palette
+        palette = get_color_palette(is_classification=True, class_count=num_classes)
+        
         # Create the bar chart
-        bars = ax.bar(range(len(class_values)), counts.values, color=colors)
+        bars = ax.bar(range(len(class_values)), counts.values, color=palette)
         
         # Set proper x-axis ticks and labels
         ax.set_xticks(range(len(class_values)))
@@ -332,45 +348,229 @@ def plot_hist_or_bar(
         patches = []
         labels = []
         for i, val in enumerate(class_values):
-            if num_classes <= 2:
-                color = CLASS_BAR_COLOR0 if i % 2 == 0 else CLASS_BAR_COLOR1
-            else:
-                color = MULTICLASS_COLORS[i % len(MULTICLASS_COLORS)]
+            color = palette[i % len(palette)]
             patches.append(mpatches.Patch(color=color))
             labels.append(f"Class {val}")
             
         if patches:  # Only create legend if we have classes
             ax.legend(patches, labels)
     else:
-        # Automatically calculate the number of bins if not specified
+        # Calculate optimal bins if not specified
         if bins is None:
-            # Use Freedman-Diaconis rule to determine optimal bin width
-            n = len(series)
-            if n > 0:
-                iqr = np.percentile(series, 75) - np.percentile(series, 25)
-                if iqr > 0:
-                    bin_width = 2 * iqr / (n ** (1/3))
-                    data_range = series.max() - series.min()
-                    if data_range > 0 and bin_width > 0:
-                        bins = max(int(np.ceil(data_range / bin_width)), 5)
-                    else:
-                        bins = 10
-                else:
-                    bins = 10
-            else:
-                bins = 10
+            bins = calculate_optimal_bins(series)
             
-            # Cap number of bins to avoid overly detailed histograms
-            bins = min(bins, 50)
-            
+        # Get regression color
+        hist_color = get_color_palette(is_classification=False)
+        
         # Create histogram with computed bins
-        sns.histplot(series, kde=False, bins=bins, color=REGRESSION_HIST_COLOR, alpha=REGRESSION_HIST_ALPHA, ax=ax)
+        sns.histplot(series, kde=False, bins=bins, color=hist_color, alpha=0.8, ax=ax)
         ax.set_xlabel("Target Value")
         ax.set_ylabel("Frequency")
         mean = series.mean()
-        ax.axvline(mean, color=REGRESSION_MEAN_LINE_COLOR, linestyle="--", label=f"Mean: {mean:.2f}")
+        ax.axvline(mean, color="r", linestyle="--", label=f"Mean: {mean:.2f}")
         ax.legend()
     ax.set_title(title)
+
+
+def plot_fold_comparison(
+    train_series: pd.Series,
+    test_series: pd.Series,
+    ax: plt.Axes,
+    is_classification: bool,
+    title: str,
+    p_value: float = None,
+    alpha: float = 0.05
+) -> None:
+    """Plot train/test comparison for a fold.
+    
+    Args:
+        train_series: Training data series
+        test_series: Test data series
+        ax: Matplotlib axes to draw on
+        is_classification: Whether to use a bar chart (True) or histogram (False)
+        title: Plot title
+        p_value: Optional p-value to show on the plot
+        alpha: Significance threshold for p-value coloring
+    """
+    # Get colors from centralized color definitions
+    train_test_colors = get_train_test_colors()
+    
+    if is_classification:
+        # Combine train and test data for classification
+        comb = pd.concat(
+            [
+                pd.DataFrame({"y": train_series, "Set": "Train"}),
+                pd.DataFrame({"y": test_series, "Set": "Test"}),
+            ]
+        )
+        # Use colors from our centralized definitions
+        sns.countplot(x="y", hue="Set", data=comb, ax=ax, 
+                    palette=train_test_colors)
+        ax.set_xlabel("Class")
+        
+        # Remove "Set" header from legend
+        handles, _ = ax.get_legend_handles_labels()
+        ax.legend(handles, ["Train", "Test"])
+    else:
+        # Calculate optimal bins based on combined data
+        data_combined = pd.concat([train_series, test_series])
+        bins = calculate_optimal_bins(data_combined, max_bins=40)
+        
+        # Create histograms with computed bins and our centralized colors
+        ax.hist(train_series, alpha=0.8, color=train_test_colors["Train"], bins=bins, label="Train")
+        ax.hist(test_series, alpha=0.8, color=train_test_colors["Test"], bins=bins, label="Test")
+        ax.set_xlabel("Target Value")
+        ax.legend()
+    
+    # Create title with p-value if provided
+    if p_value is not None:
+        # Determine if p-value is "bad" (less than alpha)
+        is_bad = p_value < alpha
+        
+        # Create the title with p-value
+        p_text = f" (p={p_value:.4f})"
+        
+        # Set the title with p-value
+        ax.set_title(f"{title}{p_text}", color='red' if is_bad else 'black')
+    else:
+        # Set the title without p-value
+        ax.set_title(title)
+
+
+def evaluate_fold_quality(
+    y: pd.Series,
+    cv_splitter: Union[RepeatedKFold, RepeatedStratifiedKFold],
+    is_classification: bool,
+    alpha: float = 0.05
+) -> Tuple[List[float], List[str], List[str]]:
+    """Evaluate the quality of CV folds using statistical tests.
+    
+    Args:
+        y: Target variable Series
+        cv_splitter: CV splitter object
+        is_classification: Whether the task is classification
+        alpha: Significance level for statistical tests
+        
+    Returns:
+        Tuple of (p_values, marks, quality_lines)
+    """
+    pvals: List[float] = []
+    marks: List[str] = []
+    quality_lines: List[str] = []
+    
+    quality_lines.append(f"[✓] p-value ≥ {alpha:.2f}: Good fold balance ({('Chi-square' if is_classification else 'Kolmogorov-Smirnov')} test)")
+    quality_lines.append(f"[✗] p-value < {alpha:.2f}: Potential fold imbalance")
+    quality_lines.append("")
+    
+    # We only evaluate the first repeat for simplicity
+    first_repeat_splits = []
+    for rep, fold, tr, te in _outer_splits(cv_splitter, y, repeats=1):
+        if rep == 1:
+            first_repeat_splits.append((tr, te, fold))
+    
+    for idx, (tr, te, fold_num) in enumerate(first_repeat_splits, start=1):
+        tr_y, te_y = y.iloc[tr], y.iloc[te]
+        if is_classification:
+            all_classes = sorted(set(tr_y) | set(te_y))
+            cont = np.vstack(
+                [
+                    [np.sum(tr_y == c) for c in all_classes],
+                    [np.sum(te_y == c) for c in all_classes],
+                ]
+            )
+            if (cont == 0).any() or len(all_classes) == 1:
+                pval = 1.0
+            else:
+                pval = stats.chi2_contingency(cont)[1]
+        else:
+            pval = stats.ks_2samp(tr_y, te_y)[1]
+        
+        pvals.append(pval)
+        mark = "✓" if pval >= alpha else "✗"
+        marks.append(mark)
+        quality_lines.append(f"  [{mark}] Fold {fold_num}: p‑value={pval:.4f}")
+    
+    return pvals, marks, quality_lines
+
+
+def build_reproduction_command(args: argparse.Namespace, seed: int, is_classification: bool, use_stratification: bool) -> str:
+    """Build a reproduction command string with the current parameters.
+    
+    Args:
+        args: Command line arguments
+        seed: Random seed used
+        is_classification: Whether the task is classification
+        use_stratification: Whether stratification is being used
+        
+    Returns:
+        Command string for reproducing the results
+    """
+    cmd = ["daftar-cv", f"--input {args.input}", f"--target {args.target}", f"--id {args.id}"]
+    
+    # Add optional arguments if they differ from defaults
+    if args.outer != 5:
+        cmd.append(f"--outer {args.outer}")
+    if args.inner != 3:
+        cmd.append(f"--inner {args.inner}")
+    if args.repeats != 3:
+        cmd.append(f"--repeats {args.repeats}")
+    if args.seed is not None:
+        cmd.append(f"--seed {args.seed}")
+    if args.task_type is not None:
+        cmd.append(f"--task_type {args.task_type}")
+    
+    # Add stratify only if it differs from the default behavior
+    # Default: stratify for classification, don't stratify for regression
+    default_stratification = is_classification
+    if use_stratification != default_stratification:
+        cmd.append(f"--stratify {'true' if use_stratification else 'false'}")
+    
+    if args.output_dir is not None:
+        cmd.append(f"--output_dir {args.output_dir}")
+    if args.alpha != 0.05:
+        cmd.append(f"--alpha {args.alpha}")
+    if args.granular:
+        cmd.append("--granular")
+    if args.force:
+        cmd.append("--force")
+        
+    return " ".join(cmd)
+
+
+def build_daftar_command(args: argparse.Namespace, seed: int, is_classification: bool = None, use_stratification: bool = None) -> str:
+    """Build a DAFTAR command string with the current parameters.
+    
+    Args:
+        args: Command line arguments
+        seed: Random seed used
+        is_classification: Whether the task is classification
+        use_stratification: Whether stratification is being used
+        
+    Returns:
+        Command string for running DAFTAR with these parameters
+    """
+    cmd = [
+        "daftar",
+        f"--input {args.input}",
+        f"--target {args.target}",
+        f"--id {args.id}",
+        f"--outer {args.outer}",
+        f"--inner {args.inner}",
+        f"--repeats {args.repeats}",
+        f"--seed {seed}",
+        "--model [xgb|rf]"
+    ]
+    
+    # Add stratify flag if this is classification and we need to override the default
+    if is_classification is not None and use_stratification is not None:
+        default_stratification = is_classification  # Default is to stratify for classification
+        if use_stratification != default_stratification:
+            cmd.append(f"--stratify {'true' if use_stratification else 'false'}")
+    
+    if args.output_dir:
+        cmd.append(f"--output_dir {args.output_dir}")
+        
+    return " ".join(cmd)
 
 
 # Command-line arguments
@@ -386,6 +586,7 @@ def get_args() -> argparse.Namespace:
     cv = p.add_argument_group("Cross‑validation")
     task = p.add_argument_group("Task Type")
     out = p.add_argument_group("Output")
+    viz = p.add_argument_group("Visualization")
 
     req.add_argument("--input", required=True, help="Path to CSV data file")
     req.add_argument("--target", required=True, help="Target column name")
@@ -395,6 +596,8 @@ def get_args() -> argparse.Namespace:
     cv.add_argument("--inner", type=int, default=3, help="Inner folds (default=3)")
     cv.add_argument("--repeats", type=int, default=3, help="Repeats (default=3)")
     cv.add_argument("--seed", type=int, help="Random seed for reproducibility")
+    cv.add_argument("--stratify", type=str, choices=["true", "false"], 
+                  help="Whether to use stratified splitting for classification tasks (default: true for classification, false for regression)")
     
     task.add_argument(
         "--task_type",
@@ -404,12 +607,24 @@ def get_args() -> argparse.Namespace:
 
     out.add_argument(
         "--output_dir",
-        help="Directory for all outputs (defaults to current directory)",
+        help="Directory for all outputs (defaults to current directory)"
     )
     out.add_argument(
         "--force", 
         action="store_true",
         help="Force overwrite if output files already exist"
+    )
+    out.add_argument(
+        "--granular",
+        action="store_true",
+        help="Generate additional detailed output files (may be large)"
+    )
+    
+    viz.add_argument(
+        "--alpha",
+        type=float,
+        default=0.05,
+        help="Statistical significance threshold for fold balance tests (default=0.05)"
     )
 
     return p.parse_args()
@@ -437,24 +652,35 @@ def main() -> None:
     ids = df[args.id]
     
     # Determine task type (auto-detect or user override)
-    global _IS_CLASSIFICATION, _TASK_TYPE
-    
     if args.task_type is None:
-        is_cls, task_type = set_task_type(y)  # should set globals, but let's make sure
-        _IS_CLASSIFICATION, _TASK_TYPE = is_cls, task_type  # explicitly set globals
-        print(f"Auto-detected {task_type.upper()} task")
+        is_cls, task_type = determine_task_type(y)
+        print(f"Auto-detected {task_type.upper()} task (override with --task_type flag if needed)")
     else:
         # User manually specified the task type
         is_cls = args.task_type == "classification"
         task_type = args.task_type
-        _IS_CLASSIFICATION, _TASK_TYPE = is_cls, task_type  # set globals
         print(f"User-specified {task_type.upper()} task")
+    
+    # Determine stratification based on task type and user input
+    if args.stratify is None:
+        # Default behavior: stratify for classification, don't stratify for regression
+        use_stratification = is_cls
+    else:
+        # User explicitly specified stratification
+        use_stratification = args.stratify == "true"
+    
+    # Print information about CV splitter
+    if is_cls:
+        if use_stratification:
+            print(f"Using StratifiedKFold for classification (default, override with --stratify false)")
+        else:
+            print(f"Using KFold for classification (as requested with --stratify false)")
+    else:
+        print(f"Using KFold for regression (default for regression tasks)")
 
-    # Repeated-KFold
+    # Use appropriate CV splitter based on task
     seed = args.seed or np.random.randint(0, 2**31 - 1)
-    outer_cv = RepeatedKFold(
-        n_splits=args.outer, n_repeats=args.repeats, random_state=seed
-    )
+    outer_cv = get_cv_splitter(task_type, args.outer, args.repeats, use_stratification, seed)
 
     # Generate base filename
     base_name = get_base_name(
@@ -470,97 +696,113 @@ def main() -> None:
         print(f"To overwrite existing files, add the --force flag:")
         
         # Build command for the user to run with --force
-        cmd = f"daftar-cv --input {args.input}"
-        if args.output_dir:
-            cmd += f" --output_dir {args.output_dir}"
-        cmd += f" --target {args.target} --id {args.id}"
-        
-        if args.outer != 5:
-            cmd += f" --outer {args.outer}"
-        if args.inner != 3:
-            cmd += f" --inner {args.inner}"
-        if args.repeats != 3:
-            cmd += f" --repeats {args.repeats}"
-        if args.seed:
-            cmd += f" --seed {args.seed}"
-        if args.task_type:
-            cmd += f" --task_type {args.task_type}"
-            
-        cmd += f" --force"
-        print(cmd)
+        cmd = build_reproduction_command(args, seed, is_cls, use_stratification) + " --force"
+        print(f"\n===\n{cmd}\n===\n")
         return 1
         
     # Create the directory
     results_dir.mkdir(parents=True, exist_ok=True)
     
-    # Split CSVs
+    # Split CSVs - only create granular ones if requested
     basic_rows, granular_rows = build_split_rows(
-        ids, y, outer_cv, args.repeats, args.inner, seed
+        ids, y, outer_cv, args.repeats, args.inner, seed, task_type, use_stratification
     )
     save_splits_csv("splits_basic.csv", basic_rows, results_dir, base_name)
-    save_splits_csv("splits_granular.csv", granular_rows, results_dir, base_name)
+    
+    if args.granular:
+        save_splits_csv("splits_granular.csv", granular_rows, results_dir, base_name)
+    
+    # Set up matplotlib style for better plots
+    plt.style.use('seaborn-v0_8-whitegrid')
     
     # Overall histogram
     plt.figure(figsize=(12, 8))
     plot_hist_or_bar(
-        y, plt.gca(), "Overall Target Distribution", classification=is_cls
+        y, plt.gca(), "Overall Target Distribution", is_classification=is_cls
     )
+    plt.tight_layout()
     for ext in ("png", "pdf"):
         filename = f"{base_name}_overall_distribution.{ext}"
-        plt.savefig(results_dir / filename, dpi=300)
+        plt.savefig(results_dir / filename, dpi=300, bbox_inches="tight")
     plt.close()
+
+    # Gather all fold/repeat combinations for quality assessment
+    all_fold_data = []
+    for rep, fold, tr_idx, te_idx in _outer_splits(outer_cv, y, args.repeats):
+        # We'll collect the data for every fold and repeat
+        all_fold_data.append((rep, fold, tr_idx, te_idx))
+    
+    # Group fold data by repeat
+    fold_data_by_repeat = {}
+    for rep, fold, tr_idx, te_idx in all_fold_data:
+        if rep not in fold_data_by_repeat:
+            fold_data_by_repeat[rep] = []
+        fold_data_by_repeat[rep].append((fold, tr_idx, te_idx))
+        
+    # Calculate p-values for each repeat separately
+    pval_map = {}
+    quality_lines_by_repeat = {}
+    
+    for rep, fold_data in fold_data_by_repeat.items():
+        # Extract fold info for this repeat only
+        rep_fold_idxs = [(fold, tr, te) for fold, tr, te in fold_data]
+        
+        # Calculate p-values for this repeat
+        pvals = []
+        marks = []
+        for fold, tr, te in rep_fold_idxs:
+            tr_y, te_y = y.iloc[tr], y.iloc[te]
+            if is_cls:
+                all_classes = sorted(set(tr_y) | set(te_y))
+                cont = np.vstack(
+                    [
+                        [np.sum(tr_y == c) for c in all_classes],
+                        [np.sum(te_y == c) for c in all_classes],
+                    ]
+                )
+                if (cont == 0).any() or len(all_classes) == 1:
+                    pval = 1.0
+                else:
+                    pval = stats.chi2_contingency(cont)[1]
+            else:
+                pval = stats.ks_2samp(tr_y, te_y)[1]
+            
+            pvals.append(pval)
+            pval_map[(rep, fold)] = pval
+            mark = "✓" if pval >= args.alpha else "✗"
+            marks.append(mark)
+        
+        # Store quality lines for this repeat
+        quality_lines = []
+        for (fold, _, _), pval, mark in zip(rep_fold_idxs, pvals, marks):
+            quality_lines.append(f"  [{mark}] Repeat {rep}, Fold {fold}: p‑value={pval:.4f}")
+        
+        quality_lines_by_repeat[rep] = quality_lines
+    
+    # Calculate p-values for fold quality assessment for reporting purposes
+    # This is for the first repeat only for reporting
+    report_pvals, report_marks, report_quality_lines = evaluate_fold_quality(y, outer_cv, is_cls, args.alpha)
 
     # Fold-wise histograms
     n_splits = args.outer
     fig, axes = plt.subplots(
         n_splits, args.repeats, figsize=(args.repeats * 4, n_splits * 4), squeeze=False
     )
-    for rep, fold, tr_idx, te_idx in _outer_splits(outer_cv, y, args.repeats):
+    
+    for rep, fold, tr_idx, te_idx in all_fold_data:
         ax = axes[fold - 1, rep - 1]
         tr_y, te_y = y.iloc[tr_idx], y.iloc[te_idx]
-        if is_cls:
-            comb = pd.concat(
-                [
-                    pd.DataFrame({"y": tr_y, "Set": "Train"}),
-                    pd.DataFrame({"y": te_y, "Set": "Test"}),
-                ]
-            )
-            # Use custom colors for train and test
-            sns.countplot(x="y", hue="Set", data=comb, ax=ax, 
-                        palette={"Train": TRAIN_HIST_COLOR, "Test": TEST_HIST_COLOR})
-            ax.set_xlabel("Class")
-        else:
-            # Use matplotlib histograms with customized colors and transparency
-            # Calculate optimal number of bins based on data
-            data_combined = pd.concat([tr_y, te_y])
-            n = len(data_combined)
-            if n > 0:
-                iqr = np.percentile(data_combined, 75) - np.percentile(data_combined, 25)
-                if iqr > 0:
-                    bin_width = 2 * iqr / (n ** (1/3))
-                    data_range = data_combined.max() - data_combined.min()
-                    if data_range > 0 and bin_width > 0:
-                        bins = max(int(np.ceil(data_range / bin_width)), 5)
-                    else:
-                        bins = 15
-                else:
-                    bins = 15
-            else:
-                bins = 15
-            
-            # Cap number of bins to avoid overly detailed histograms
-            bins = min(bins, 40)
-            
-            # Create histograms with computed bins
-            ax.hist(tr_y, alpha=HIST_ALPHA, color=TRAIN_HIST_COLOR, bins=bins, label="Train")
-            ax.hist(te_y, alpha=HIST_ALPHA, color=TEST_HIST_COLOR, bins=bins, label="Test")
-            ax.set_xlabel("Target Value")
-            ax.legend()
-        ax.set_title(f"Fold {fold}")
+        
+        # Get p-value from our map - now we have p-values for ALL repeats
+        p_value = pval_map.get((rep, fold), None)
+        
+        # Use the specialized comparison plot function
+        plot_fold_comparison(tr_y, te_y, ax, is_cls, f"Fold {fold}, Repeat {rep}", p_value, args.alpha)
+    
     plt.tight_layout()
     for ext in ("png", "pdf"):
         filename = f"{base_name}_histograms.{ext}"
-        plt.savefig(results_dir / filename, dpi=300)
+        plt.savefig(results_dir / filename, dpi=300, bbox_inches="tight")
     plt.close()
 
     # Nested-CV ASCII diagram & stats report
@@ -576,7 +818,7 @@ def main() -> None:
         "DATASET SUMMARY",
         "-" * 40,
         f"- Total samples: {len(y)}",
-        f"- TASK TYPE: {_TASK_TYPE.upper()}",
+        f"- TASK TYPE: {task_type.upper()}",
         f"- TARGET COLUMN: {args.target}",
         f"- ID COLUMN: {args.id}",
         "",
@@ -705,63 +947,34 @@ def main() -> None:
             console_lines.append(f"  └─ Identical structure to Repeat 1 (with different random splits)")
         console_lines.append("")
 
-    # Prepare variables needed for reports
-    alpha = 0.05
-    pvals: list[float] = []
-    
-    daftar_cmd = (
-        f"  daftar --input {args.input} --target {args.target} --id {args.id} "
-        f"--outer {args.outer} --inner {args.inner} --repeats {args.repeats} "
-        f"--seed {seed} --model [xgb|rf]"
-    )
-    if args.output_dir:
-        daftar_cmd += f" --output_dir {args.output_dir}"
-
     # Fold quality assessment section (both report and console)
-    quality_lines = [
+    quality_header = [
         "=" * 80,
         "FOLD QUALITY ASSESSMENT",
         "=" * 80,
         "",
-        f"[✓] p-value ≥ 0.05: Good fold balance ({('Chi-square' if is_cls else 'Kolmogorov-Smirnov')} test)",
-        f"[✗] p-value < 0.05: Potential fold imbalance",
-        "",
     ]
-    for idx, (tr, te) in enumerate(outer_cv.split(y), start=1):
-        tr_y, te_y = y.iloc[tr], y.iloc[te]
-        if is_cls:
-            all_classes = sorted(set(tr_y) | set(te_y))
-            cont = np.vstack(
-                [
-                    [np.sum(tr_y == c) for c in all_classes],
-                    [np.sum(te_y == c) for c in all_classes],
-                ]
-            )
-            if (cont == 0).any() or len(all_classes) == 1:
-                pval = 1.0
-            else:
-                pval = stats.chi2_contingency(cont)[1]
-        else:
-            pval = stats.ks_2samp(tr_y, te_y)[1]
-        pvals.append(pval)
-        mark = "✓" if pval >= alpha else "✗"
-        quality_lines.append(f"  [{mark}] Fold {idx}: p‑value={pval:.4f}")
+    report_lines.extend(quality_header)
+    console_lines.extend(quality_header)
+    report_lines.extend(report_quality_lines)
+    console_lines.extend(quality_lines_by_repeat[1])
 
-    good = sum(p >= alpha for p in pvals)
-    quality_lines += [
+    # Summary section
+    good = sum(1 for p in report_pvals if p >= args.alpha)
+    summary_lines = [
         "",
         "SUMMARY",
         "-" * 40,
-        f"{good}/{len(pvals)} folds have sufficiently similar distributions.",
+        f"{good}/{len(report_pvals)} folds have sufficiently similar distributions.",
     ]
-    if good < 0.8 * len(pvals):
-        quality_lines += [
+    if good < 0.8 * len(report_pvals):
+        summary_lines += [
             "",
             "⚠️  WARNING: Too many imbalanced folds. Consider a different seed.",
         ]
         
-    report_lines.extend(quality_lines)
-    console_lines.extend(quality_lines)
+    report_lines.extend(summary_lines)
+    console_lines.extend(summary_lines)
     
     # Files generated section (both report and console)
     files_list = [
@@ -770,13 +983,22 @@ def main() -> None:
         "-" * 40,
         f"- Directory: {results_dir.name}/",
         f"    {base_name}_splits_basic.csv",
-        f"    {base_name}_splits_granular.csv",
+    ]
+    
+    if args.granular:
+        files_list.append(f"    {base_name}_splits_granular.csv")
+        
+    files_list.extend([
         f"    {base_name}_histograms.png/pdf",
         f"    {base_name}_overall_distribution.png/pdf", 
         f"    {base_name}_fold_report.txt",
-    ]
+    ])
+    
     report_lines.extend(files_list)
     console_lines.extend(files_list)
+    
+    # Build the DAFTAR command for next steps
+    daftar_cmd = build_daftar_command(args, seed, is_cls, use_stratification)
     
     # Next steps section (both report and console)
     next_steps = [

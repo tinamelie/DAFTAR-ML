@@ -10,6 +10,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from daftar.viz.colors import (
+    DENSITY_ACTUAL_COLOR,
+    DENSITY_PREDICTED_COLOR,
+    DENSITY_ALPHA,
+    CONFUSION_MATRIX_CMAP
+)
+
 
 def determine_task_type(y: pd.Series) -> Tuple[bool, str]:
     """
@@ -92,12 +99,16 @@ def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_d
         'Actual': y_test
     }
     
+    # Add a 'Correct' column only for classification problems
+    if not is_regression:
+        # For classification, compare predicted and actual classes
+        data_dict['Correct'] = ['TRUE' if y_pred[i] == y_test[i] else 'FALSE' for i in range(len(y_pred))]
+    
     # Add residual columns only for regression problems
     if is_regression:
         residuals = y_test_array - y_pred_array
         data_dict['Residual'] = residuals
         data_dict['Abs_Residual'] = np.abs(residuals)
-    # No additional columns for classification problems
         
     df = pd.DataFrame(data_dict)
     
@@ -141,7 +152,7 @@ def evaluate_predictions(y_true, y_pred):
     }
 
 
-def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matrix", metric=None):
+def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matrix", metric=None, cmap=None):
     """Generate a confusion matrix plot.
     
     Args:
@@ -150,6 +161,7 @@ def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matr
         output_path: Path to save the plot
         title: Title of the plot
         metric: Primary metric to display (default: accuracy)
+        cmap: Colormap for the confusion matrix (default: defined in colors.py)
     """
     from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, roc_auc_score, precision_score, recall_score
     import os
@@ -165,7 +177,10 @@ def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matr
     plt.figure(figsize=(10, 8), dpi=150)
     
     # Use a more distinct colormap and larger font sizes
-    ax = sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
+    # Use the colormap from parameters, or the default from colors.py if not specified
+    colormap = cmap if cmap is not None else CONFUSION_MATRIX_CMAP
+    
+    ax = sns.heatmap(cm, annot=True, fmt="d", cmap=colormap, cbar=False,
                xticklabels=classes, yticklabels=classes, annot_kws={"size": 16})
     
     # Increase font sizes for better readability
@@ -215,7 +230,7 @@ def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matr
     print(f"Confusion matrix saved at {output_path}")
 
 
-def generate_density_plots(fold_results, all_true_values, all_predictions, output_dir, target_name, problem_type="regression"):
+def generate_density_plots(fold_results, all_true_values, all_predictions, output_dir, target_name, problem_type="regression", cmap=None):
     """Generate density plots for the entire set of predictions.
     
     Args:
@@ -225,6 +240,7 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
         output_dir: Output directory path
         target_name: Name of target variable
         problem_type: Type of problem ('regression' or 'classification')
+        cmap: Optional colormap for confusion matrices
     """
     # For each fold, save a CSV of predicted vs actual
     for fold in fold_results:
@@ -250,14 +266,15 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
                 y_test, y_pred, 
                 confusion_path, 
                 title=f"Confusion Matrix - Fold {fold_idx}",
-                metric=fold.get('metric', None)
+                metric=fold.get('metric', None),
+                cmap=cmap
             )
         # Generate density plots for regression problems (per fold)
         elif problem_type == "regression":
             # Create per-fold density plot
             plt.figure(figsize=(10, 6))
-            sns.kdeplot(y_test, label='Actual', fill=True, alpha=0.5, color='#00BFC4')
-            sns.kdeplot(y_pred, label='Predicted', fill=True, alpha=0.5, color='#F8766D')
+            sns.kdeplot(y_test, label='Actual', fill=True, alpha=DENSITY_ALPHA, color=DENSITY_ACTUAL_COLOR)
+            sns.kdeplot(y_pred, label='Predicted', fill=True, alpha=DENSITY_ALPHA, color=DENSITY_PREDICTED_COLOR)
             plt.title(f"Density Plot - Fold {fold_idx}")
             plt.xlabel(target_name)
             plt.ylabel('Density')
@@ -296,23 +313,25 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
             all_true_values_array, all_predictions_array,
             confusion_path,
             title="Global Confusion Matrix (All Folds)",
-            metric=metric
+            metric=metric,
+            cmap=cmap
         )
         print(f"Global confusion matrix saved at {confusion_path}")
-        # Skip the rest of the function for classification problems
-        # Save overall predictions vs. actual targets to a CSV (
+        
+        # Build a simplified overall predictions DataFrame (ID, Fold, Actual, Predicted, Correct)
         csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
         
-        # Extract all sample data with fold information
         all_ids = []
         all_fold_indices = []
-        all_actual_values = []  # Recreate to match the fold indices order
-        all_predicted_values = []  # Recreate to match the fold indices order
+        all_actual_values = []
+        all_predicted_values = []
+        correct_flags = []
         
+        # Gather data from each fold
         for fold_idx, fold in enumerate(fold_results):
             fold_num = fold_idx + 1
             
-            # Get IDs preferring original IDs if available
+            # Prefer original IDs when available
             if 'original_ids' in fold and fold['original_ids'] is not None:
                 sample_ids = fold['original_ids']
             elif 'ids_test' in fold and fold['ids_test'] is not None:
@@ -320,64 +339,98 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
             else:
                 sample_ids = [f"Sample_{i+1}" for i in range(len(fold['y_test']))]
             
-            # Get true values and predictions for this fold
             y_true = fold['y_test']
             y_pred = fold['y_pred']
             
-            # Collect all data with fold information
             for i in range(len(y_true)):
                 all_ids.append(sample_ids[i])
                 all_fold_indices.append(fold_num)
                 all_actual_values.append(y_true[i])
                 all_predicted_values.append(y_pred[i])
+                correct_flags.append(y_true[i] == y_pred[i])
         
-        # Create main DataFrame with predictions, IDs, and fold
-        df = pd.DataFrame({
+        # Create DataFrame with raw data from all folds
+        raw_df = pd.DataFrame({
             'ID': all_ids,
             'Fold': all_fold_indices,
             'Actual': all_actual_values,
-            'Predicted': all_predicted_values
-            # No 'Match' column for classification problems
+            'Predicted': all_predicted_values,
+            'Correct': ['TRUE' if flag else 'FALSE' for flag in correct_flags]
         })
         
-        # Get unique class values
-        unique_classes = np.unique(df['Actual'].values)
+        # Get unique IDs to create a summary by ID
+        unique_ids = sorted(list(set(all_ids)))
         
-        # Calculate global statistics instead of row-specific ones
-        class_stats = {}
-
-        # Get counts for each combination of actual and predicted classes
-        stats_df = pd.DataFrame()
+        # Get unique classes from both actual and predicted values
+        all_classes = sorted(list(set(list(set(all_actual_values)) + list(set(all_predicted_values)))))
         
-        # Calculate stats for all samples combined
-        for actual_class in unique_classes:
-            # Calculate total for this actual class
-            actual_mask = df['Actual'] == actual_class
-            total_this_class = len(df.loc[actual_mask])
+        # Prepare summary data
+        summary_data = {
+            'ID': []
+        }
+        
+        # Add a column for each class to count predictions
+        for cls in all_classes:
+            summary_data[f'Predicted_{cls}'] = []
+        
+        summary_data['Actual'] = []
+        summary_data['Overall_Prediction'] = []
+        summary_data['Correct'] = []
+        
+        # Process each unique ID
+        for id_val in unique_ids:
+            id_rows = raw_df[raw_df['ID'] == id_val]
             
-            # For each predicted class, calculate count and percentage
-            for pred_class in unique_classes:
-                pred_mask = df['Predicted'] == pred_class
-                # Count samples that match both conditions
-                count = len(df.loc[actual_mask & pred_mask])
-                # Calculate percentage
-                pct = (count / total_this_class) * 100 if total_this_class > 0 else 0
+            if len(id_rows) == 0:
+                continue
                 
-                # Add these stats as columns to the dataframe
-                col_name = f"count_{actual_class}_pred_{pred_class}"
-                pct_name = f"pct_{actual_class}_pred_{pred_class}"
-                df[col_name] = count
-                df[pct_name] = pct
+            summary_data['ID'].append(id_val)
+            
+            # Most common actual value (should be the same for all folds)
+            actual_value = id_rows['Actual'].value_counts().index[0]
+            summary_data['Actual'].append(actual_value)
+            
+            # Count predictions for each class
+            pred_counts = id_rows['Predicted'].value_counts().to_dict()
+            for cls in all_classes:
+                summary_data[f'Predicted_{cls}'].append(pred_counts.get(cls, 0))
+            
+            # Find the most predicted class(es)
+            max_count = max(pred_counts.values()) if pred_counts else 0
+            max_classes = [cls for cls, count in pred_counts.items() if count == max_count]
+            
+            # Handle potential ties
+            if len(max_classes) == 1:
+                overall_pred = max_classes[0]
+            else:
+                # If there's a tie, list all tied classes
+                overall_pred = '/'.join(str(cls) for cls in max_classes)
+            
+            summary_data['Overall_Prediction'].append(overall_pred)
+            
+            # Check if the overall prediction matches the actual value
+            # For tied predictions, use a special 'TIE' label when the actual value is among the tied predictions
+            # Always convert to string before checking for '/'
+            overall_pred_str = str(overall_pred)
+            if '/' in overall_pred_str:  # This indicates a tie
+                is_correct = 'TIE' if str(actual_value) in overall_pred_str.split('/') else 'FALSE'
+            else:  # Single prediction
+                is_correct = 'TRUE' if overall_pred == actual_value or str(overall_pred) == str(actual_value) else 'FALSE'
+            
+            summary_data['Correct'].append(is_correct)
         
-        # Save to the single output file
-        df.to_csv(csv_path, index=False)
+        # Create the summary DataFrame
+        summary_df = pd.DataFrame(summary_data)
+        
+        # Save the summary CSV
+        summary_df.to_csv(csv_path, index=False)
         print(f"Overall predictions vs actual CSV saved at {csv_path}")
         return
     else:
         # For regression, use density plots as before
         plt.figure(figsize=(12, 6))
-        sns.kdeplot(all_true_values_array, label='Actual', fill=True, alpha=0.5, color='#00BFC4')
-        sns.kdeplot(all_predictions_array, label='Predicted', fill=True, alpha=0.5, color='#F8766D')
+        sns.kdeplot(all_true_values_array, label='Actual', fill=True, alpha=DENSITY_ALPHA, color=DENSITY_ACTUAL_COLOR)
+        sns.kdeplot(all_predictions_array, label='Predicted', fill=True, alpha=DENSITY_ALPHA, color=DENSITY_PREDICTED_COLOR)
         plt.title(f"Global Density Plot of Actual vs. Predicted for {target_name}")
         plt.xlabel(f"{target_name} (Target Value)")
         plt.ylabel('Density')
@@ -484,9 +537,29 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
     # Create a text file summarizing the most important features based on SHAP stats.
     summary_path = os.path.join(main_output_dir, "shap_features_summary.txt")
     
+    # Check if feature_impact_df is None
+    if feature_impact_df is None:
+        print("Important features summary cannot be generated: no SHAP data available")
+        return
+        
+    # Create a default target if missing from config
+    target = getattr(config, 'target', 'Target')
+    metric = getattr(config, 'metric', 'accuracy')
+    model_type = getattr(config, 'model', 'model')
+        
     positive_features = feature_impact_df[feature_impact_df["Mean_Signed"] > 0].sort_values("Mean_Signed", ascending=False)
     negative_features = feature_impact_df[feature_impact_df["Mean_Signed"] < 0].sort_values("Mean_Signed", ascending=True)
     magnitude_features = feature_impact_df.sort_values("Impact_Magnitude", ascending=False)
+    
+    # Also create rankings based on sample-level and fold-level impact if available
+    has_sample_level = "Sample_Level_Impact" in feature_impact_df.columns
+    has_fold_level = "Fold_Level_Impact" in feature_impact_df.columns
+    
+    if has_sample_level:
+        sample_level_features = feature_impact_df.sort_values("Sample_Level_Impact", ascending=False)
+    
+    if has_fold_level:
+        fold_level_features = feature_impact_df.sort_values("Fold_Level_Impact", ascending=False)
     
     # Get configuration values
     target = config.target
@@ -510,21 +583,58 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             f.write("Target Transformation: Log1p\n")
         f.write("\n")
         
+        # Explanation of different ranking methods
         f.write("="*80 + "\n")
-        f.write(f"TOP {top_n} FEATURES BY OVERALL IMPACT MAGNITUDE\n")
+        f.write("IMPORTANT: EXPLANATION OF FEATURE RANKING METHODS\n")
         f.write("="*80 + "\n\n")
-        f.write("These features have the strongest overall effect on predictions (regardless of direction).\n\n")
+        f.write("DAFTAR-ML uses multiple methods to rank feature importance:\n\n")
+        f.write("1. SAMPLE-LEVEL IMPACT (shown in shap_beeswarm_sample.png)\n")
+        f.write("   * Calculated directly from raw SHAP values across all samples\n")
+        f.write("   * Shows features with strongest overall impact\n")
+        f.write("   * Can highlight features important in specific contexts\n\n")
         
-        for i, (feature, row) in enumerate(magnitude_features.head(top_n).iterrows(), 1):
-            direction = "Increases" if row["Mean_Signed"] > 0 else "Decreases"
-            magnitude = abs(row["Mean_Signed"])
-            std = row["Std_MeanAcrossFolds"]
-            f.write(f"{i}. {feature}\n")
-            f.write(f"   {direction} prediction by {magnitude:.6f} (±{std:.6f})\n")
-            # Only show correlation information for regression problems
-            if config.problem_type == 'regression' and 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
-                f.write(f"   Correlation with target: {row['Target_Correlation']:.6f}\n")
-            f.write("\n")
+        f.write("2. FOLD-LEVEL IMPACT (shown in shap_beeswarm_fold.png)\n")
+        f.write("   * Calculated by averaging SHAP values within each fold first\n")
+        f.write("   * Shows features that are consistently important across data splits\n")
+        f.write("   * More robust to random variation in the data\n\n")
+        
+        # First show sample-level rankings (beeswarm plot method)
+        if has_sample_level:
+            f.write("="*80 + "\n")
+            f.write(f"TOP {top_n} FEATURES BY SAMPLE-LEVEL IMPACT\n")
+            f.write("="*80 + "\n\n")
+            f.write("These features have the strongest overall effects on individual predictions.\n")
+            f.write("This ranking matches the feature order in shap_beeswarm_sample_level.png\n\n")
+            
+            for i, (feature, row) in enumerate(sample_level_features.head(top_n).iterrows(), 1):
+                direction = "Increases" if row["Mean_Signed"] > 0 else "Decreases"
+                sample_impact = row["Sample_Level_Impact"]
+                f.write(f"{i}. {feature}\n")
+                f.write(f"   Sample-level impact: {sample_impact:.6f}\n")
+                f.write(f"   Direction: {direction} prediction\n")
+                if "Fold_Presence" in row:
+                    f.write(f"   Present in {row['Fold_Presence']*100:.1f}% of cross-validation folds\n")
+                f.write("\n")
+        
+        # Then show fold-level rankings
+        if has_fold_level:
+            f.write("="*80 + "\n")
+            f.write(f"TOP {top_n} FEATURES BY FOLD-LEVEL IMPACT\n")
+            f.write("="*80 + "\n\n")
+            f.write("These features have the strongest and most consistent effects across cross-validation folds.\n")
+            f.write("This ranking matches the feature order in shap_beeswarm_fold_level.png\n\n")
+            
+            for i, (feature, row) in enumerate(fold_level_features.head(top_n).iterrows(), 1):
+                direction = "Increases" if row["Mean_Signed"] > 0 else "Decreases"
+                fold_impact = row["Fold_Level_Impact"]
+                f.write(f"{i}. {feature}\n")
+                f.write(f"   Fold-level impact: {fold_impact:.6f}\n")
+                f.write(f"   Direction: {direction} prediction\n")
+                if "Fold_Presence" in row:
+                    f.write(f"   Present in {row['Fold_Presence']*100:.1f}% of cross-validation folds\n")
+                f.write("\n")
+        
+        # Traditional feature importance section removed as requested
         
         f.write("="*80 + "\n")
         f.write(f"TOP {top_n} FEATURES WITH POSITIVE IMPACT (INCREASE PREDICTIONS)\n")

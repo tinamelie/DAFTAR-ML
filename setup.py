@@ -39,15 +39,15 @@ setup(
     license="See LICENSE file",
     python_requires=">=3.8",
     packages=find_packages(exclude=("tests", "results", "examples")),
-    py_modules=["preprocess", "cv_calculator", "run_daftar"],
     include_package_data=True,
     install_requires=read_requirements(),
     entry_points={
         "console_scripts": [
             "daftar=daftar.cli:main",
             "run-daftar=daftar.cli:main",
-            "daftar-preprocess=preprocess:main",
-            "daftar-cv=cv_calculator:main",
+            "daftar-preprocess=daftar.tools.preprocess:main",
+            "daftar-cv=daftar.tools.cv_calculator:main",
+            "daftar-colors=daftar.tools.colors:main",
         ]
     },
     # Will add appropriate classifiers later

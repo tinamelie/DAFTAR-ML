@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
 
+from daftar.viz.colors import CONFUSION_MATRIX_CMAP, REGRESSION_MEAN_LINE_COLOR
+
 
 def create_shap_summary(shap_values: List[np.ndarray], 
                       feature_names: List[str],
@@ -110,7 +112,7 @@ def create_prediction_analysis(y_true: List,
         
         # Plot 2: Residuals
         axes[1].scatter(y_true, residuals, alpha=0.5)
-        axes[1].axhline(y=0, color='r', linestyle='--')
+        axes[1].axhline(y=0, color=REGRESSION_MEAN_LINE_COLOR, linestyle='--')
         axes[1].set_xlabel('Actual')
         axes[1].set_ylabel('Residual (Predicted - Actual)')
         axes[1].set_title('Residual Plot')
@@ -128,7 +130,7 @@ def create_prediction_analysis(y_true: List,
         fig, ax = plt.subplots(figsize=(10, 8))
         
         # Plot confusion matrix
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
+        sns.heatmap(cm, annot=True, fmt="d", cmap=CONFUSION_MATRIX_CMAP, cbar=False,
                    xticklabels=classes, yticklabels=classes, ax=ax)
         ax.set_xlabel('Predicted')
         ax.set_ylabel('True')

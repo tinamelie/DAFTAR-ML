@@ -1,14 +1,14 @@
 ## **D**ata **A**gnostic **F**eature-**T**arget **A**nalysis & **R**anking **M**achine **L**earning Pipeline
  
-DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It supports both regression and classification tasks and works with a .csv containing a single target column and multiple feature columns.
+DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It supports both regression and classification tasks. It expects a single CSV file with one target column and any number of feature columns.
 
  Functionality Highlights:
 
-- Automated data preprocessing and feature selection via mutual information
-- Model training with nested cross-validation 
-- Hyperparameter optimization with Optuna
-- SHAPley Additive exPlanations (SHAP) for scoring feature importance
-- Publication-quality visualizations
+- Automates data preprocessing and feature selection via mutual information
+- Trains models with nested cross-validation 
+- Optimizes hyperparameters with Optuna
+- Scores features using SHAPley Additive exPlanations (SHAP)
+- Generates publication-quality visualizations
 
 ## Use Cases
 
@@ -17,7 +17,7 @@ DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **
 
 ## Quick Start
 
-### Example dataset (comma‑separated .csv file):
+### Example dataset (comma‑separated .csv file):
 
 
  ID column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Target column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
@@ -29,7 +29,7 @@ DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **
 
 In this example, we use gene clusters from tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, is growth rates of species in galactose. The aim is to identify which gene clusters (**features**) are important to this **target**.
 ### Results example (summary):
-| Rank |    Feature    |  Score |
+| Rank |    Feature    |  SHAP Score |
 |------|:-------------:|:------:|
 | 1    | Gene_cluster1 |  0.556 |
 | 2    | Gene_cluster2 |  0.461 |
@@ -46,16 +46,23 @@ A typical DAFTAR-ML workflow consists of three steps:
 
 ### 1. Preprocess raw data (optional)
 ```bash
-daftar-preprocess --input data.csv --target TARGET --id ID --output_dir OUTPUT_DIRECTORY
+daftar-preprocess --input data.csv --target target_column --id sample_id --output_dir output_directory
 ```
 
 ### 2. Visualize CV splits (optional)
 ```bash
-daftar-cv --input preprocessed_data.csv --target TARGET --id ID --output_dir OUTPUT_DIRECTORY
+daftar-cv --input preprocessed_data.csv --target target_column --id sample_id --output_dir output_directory
 ```
-### 3. Run the main pipeline
+
+### 3. Visualize color palettes (optional)
+```bash
+daftar-colors --output_dir output_directory
 ```
-daftar --input preprocessed_data.csv --target TARGET --id ID --model [xgb|rf] --output_dir OUTPUT_DIRECTORY
+This tool displays all color palettes used in DAFTAR-ML visualizations, including train/test colors, density plots, and confusion matrix colormaps. Use this to ensure consistent color schemes in your custom visualizations or publications.
+
+### 4. Run the main pipeline
+```
+daftar --input preprocessed_data.csv --target target_column --id sample_id --model [xgb|rf] --output_dir output_directory
 ```
 ## Input Data
 
@@ -113,7 +120,7 @@ DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on yo
 
 1. Clone the repository and navigate to the DAFTAR-ML directory:
    ```bash
-   git clone https://github.com/tmelie/DAFTAR-ML.git
+   git clone https://github.com/tinamelie/DAFTAR-ML.git
    cd DAFTAR-ML
    ```
 
@@ -122,7 +129,11 @@ DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on yo
    pip install -r requirements.txt
    ```
 
-3. Run scripts directly from the DAFTAR-ML directory
+3. Run scripts directly from the DAFTAR-ML tools directory:
+   ```bash
+   cd daftar/tools
+   daftar-preprocess --input data.csv --target target_column --id id_column
+   ```
 
 ## Dependencies
 
@@ -141,22 +152,55 @@ DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on yo
 ## Code Structure
 
 ```
-DAFTAR-ML/
-├── setup.py            # Package installation script for pip
-├── preprocess.py       # Feature selection & cleaning helper
-├── cv_calculator.py    # ASCII visualisation of nested CV splits
-├── run_daftar.py       # Main pipeline launcher (thin wrapper around `daftar.cli`)
-├── daftar/             # Library package
-│   ├── cli.py          # Argument parsing, builds `Config` and launches `Pipeline`
-│   ├── core/
-│   │   ├── config.py   # Dataclass that stores every pipeline parameter
-│   │   ├── pipeline.py # High-level stuff (training → evaluation → plots)
-│   │   └── callbacks.py # Optuna early-stopping callback
-│   ├── models/         # Scikit-learn & XGBoost wrappers with Optuna objectives
-│   ├── viz/            # All plotting utilities (SHAP, metrics, density, Optuna)
-│   └── utils/          # Misc helpers (warning suppression, palettes, etc.)
-└── test_data/          # Example datasets
+daftar/                   # Main library package
+├── core/                    # Core pipeline components
+│   ├── pipeline.py          # Main pipeline (simplified)
+│   ├── data_processing.py   # Data loading and preparation
+│   ├── evaluation.py        # Generic evaluation logic
+│   ├── config.py            # Configuration handling
+│   ├── callbacks.py         # Optimization callbacks
+│   └── logging_utils.py     # Logging utilities
+├── models/                  # All model implementations
+│   ├── base.py              # Base model classes
+│   ├── regression/          # Regression models (keep existing)
+│   └── classification/      # Classification models (keep existing)
+├── analysis/                # Analysis by problem type
+│   ├── __init__.py
+│   ├── regression.py        # Regression-specific analysis
+│   └── classification.py    # Classification-specific analysis
+├── viz/                     # All visualizations
+│   ├── __init__.py
+│   ├── common.py            # Common visualization utilities
+│   ├── regression.py        # Regression visualizations
+│   ├── classification.py    # Classification visualizations
+│   ├── shap.py              # SHAP visualizations (simplified)
+│   ├── feature_importance.py # Feature importance visualizations
+│   └── optuna.py            # Hyperparameter tuning visualizations
+├── utils/                   # General utilities
+│   ├── __init__.py
+│   ├── validation.py        # Data validation
+│   ├── file_utils.py        # File handling
+│   └── warnings.py          # Warning management
+├── tools/                   # Command-line tools
+│   ├── __init__.py
+│   ├── preprocess.py        # Preprocessing script
+│   ├── cv_calculator.py     # CV calculation script
+│   └── run_daftar.py        # Main entry point script
+└── cli.py                   # Command-line interface
+
+# Root level files
+setup.py                     # Package installation configuration
+requirements.txt             # Package dependencies
+example_config.yaml          # Example YAML configuration
+test_data/                   # Example datasets for testing
+
+# Legacy scripts (maintained for backward compatibility)
+cv_calculator.py             # Legacy CV calculator script
+preprocess.py                # Legacy preprocessing script
+run_daftar.py                # Legacy main entry point script
 ```
+
+> **Note:** For better organization, the main functionality has been moved into the `daftar/tools/` directory, but the root-level scripts are maintained for backward compatibility. When installed as a package, you can use the command-line tools (`daftar`, `daftar-preprocess`, `daftar-cv`) directly.
 
 ## Detailed Usage Guide
 
@@ -165,7 +209,7 @@ DAFTAR-ML/
 Before running DAFTAR-ML, prepare your data using the preprocessing script. This step is optional but recommended for better performance and more accurate results:
 
 ```bash
-python preprocess.py --input data.csv --target TARGET --id ID --output_dir OUTPUT_DIRECTORY
+daftar-preprocess --input data.csv --target target_column --id id_column --output_dir output_directory
 ```
 
 The preprocessing module uses mutual information to select features with the strongest relationship to the target variable, without assuming linearity. It selects the top-k features with highest MI scores, reducing dimensionality while preserving predictive power. Results include a summary report of transformations and selected features. Produces the following files:
@@ -238,7 +282,7 @@ DAFTAR-ML uses nested cross-validation to provide unbiased model evaluation and 
 ##### CV Calculator Usage
 
 ```bash
-daftar-cv --input preprocessed_data.csv --target TARGET --id ID --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir OUTPUT_DIRECTORY
+daftar-cv --input preprocessed_data.csv --target target_column --id id_column --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir output_directory
 ```
 
 #### CV Calculator Parameters
@@ -298,7 +342,7 @@ Note: Larger p-values are better for fold quality.
 After preprocessing your data and planning your cross-validation strategy, run the main DAFTAR-ML pipeline to train models, analyze feature importance, and generate visualizations:
 
 ```bash
-daftar --input preprocessed_data.csv --target TARGET --id ID --model [xgb|rf] --output_dir OUTPUT_DIRECTORY
+daftar --input preprocessed_data.csv --target target_column --id id_column --model [xgb|rf] --output_dir output_directory
 ```
 #### DAFTAR-ML Pipeline
 
@@ -349,13 +393,30 @@ results/
 └── DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
     ├── DAFTAR-ML_run.log                     # Combined console + file log
     ├── metrics_overall.csv                   # Mean scores across folds
-    ├── shap_feature_impact_analysis.csv      # Signed SHAP importances (mean)
-    ├── feature_importance_overall.csv        # Model-supplied importances
-    ├── feature_importance_bar.png            # Top-N bar plot (whiskers = std)
+    ├── feature_importance/                   # Feature importance directory
+    │   ├── feature_importance_values_fold.csv  # Fold-level feature importance
+    │   ├── feature_importance_values_sample.csv # Sample-level feature importance 
+    │   ├── feature_importance_bar_fold.png    # Fold-level importance visualization
+    │   └── feature_importance_bar_sample.png  # Sample-level importance visualization
+    ├── shap_beeswarm_sample.png              # SHAP distribution by sample-level impact
+    ├── shap_beeswarm_fold.png                # SHAP distribution by fold-level consistency
+    ├── shap_bar_sample.png                   # Top features by sample-level impact
+    ├── shap_bar_fold.png                     # Top features by fold-level impact
+    ├── shap_corr_bar_sample.png              # Target correlations by sample (regression)
+    ├── shap_corr_bar_fold.png                # Target correlations by fold (regression)
+    ├── shap_feature_metrics.csv              # Feature statistics with both calculation methods
+    ├── shap_features_summary.txt             # Comprehensive feature analysis and rankings
+    ├── predictions_vs_actual_overall.csv     # Combined predictions from all folds
     ├── density_actual_vs_pred_global.png     # Regression density plot
-    ├── figures_explanation.txt               # Plain-text explanation of every figure
-    ├── fold_1/ … fold_N/                     # One dir per outer fold (saved model, preds, SHAP, Optuna plots)
-    └── optuna_plots/                         # Global hyper-parameter search visualisations
+    ├── figures_explanation.txt               # Detailed explanation of all output files
+    ├── fold_1/ … fold_N/                     # Individual fold files
+    │   ├── best_model_fold_N.pkl              # Trained model for this fold
+    │   ├── confusion_matrix_fold_N.png        # Confusion matrix for this fold
+    │   ├── feature_importance_fold_N.csv      # Feature importance for this fold
+    │   ├── predictions_vs_actual_fold_N.csv   # Predictions for this fold
+    │   ├── shap_values_fold_N.csv             # SHAP values for this fold
+    │   └── optuna_plots/                      # Hyperparameter tuning visualizations
+    └── shap_values_all_folds.csv             # Combined SHAP values from all folds
 ```
 
 ### Main Output Files
@@ -364,33 +425,80 @@ results/
 * `performance.txt`: Summary of model performance metrics
 * `metrics.json`: Detailed performance metrics in JSON format
 
+
+##### SHAP Analysis (recommended for reporting):
+  * **Understanding Sample vs. Fold Methods:**
+    * **Sample-level calculations**: Based on raw SHAP values across all samples combined, identifies features with strongest overall impact regardless of fold structure
+      * Advantages: Captures the full feature impact across the entire dataset
+      * Limitations: May be influenced by outliers or specific data contexts
+    * **Fold-level calculations**: First calculates mean SHAP values within each fold, then averages these means across folds
+      * Advantages: More robust to outliers and better identifies consistently important features
+      * Limitations: May undervalue features that are important in specific contexts only
+
+  * **Interpreting Differences Between Rankings:**
+    * Features ranking higher in sample-level files: Strong but context-dependent effects that may vary between folds
+    * Features ranking higher in fold-level files: More consistent effects across different data splits (more reliable)
+    * Features high in both calculation methods: Most reliable features with strong, consistent impact across all contexts
+
+  * **Visualizations:**
+    * `shap_beeswarm_sample.png` & `shap_beeswarm_fold.png`: SHAP value distribution for all features, colored by feature value
+    * `shap_bar_sample.png` & `shap_bar_fold.png`: Top 25 positive/negative impact features (fold version includes cross-validation error bars)
+    * Regression only:
+      * `shap_corr_bar_sample.png` & `shap_corr_bar_fold.png`: These plots show the correlation between feature SHAP values and the target variable (regression only)
+        * What they measure: For each feature, how consistently do its SHAP values align with the target values?
+        * Interpretation:
+          * Red bars (positive correlation): Features where higher values consistently contribute to higher predictions
+          * Blue bars (negative correlation): Features where higher values consistently contribute to lower predictions
+          * Sample version uses all samples together; fold version calculates per fold then averages (more robust)
+
+* **Results Files:**
+  * `shap_values_raw.csv`: Contains individual SHAP values for each test sample and feature (large matrix with samples as rows, features as columns)
+  * `shap_feature_metrics.csv`: Statistical summary of feature impact using both sample-level and fold-level calculations, includes mean impact, standard deviation, and direction
+  * `shap_features_summary.txt`: Comprehensive textual summary showing top features by each ranking method, with detailed explanations of positive/negative impact and feature rankings by different methodologies
+  * `shap_values_all_folds.csv`: Aggregated SHAP values organized by feature and fold for cross-validation analysis
+
+> **Note:** SHAP values provide more reliable feature impact analysis than traditional importance rankings.
+
 #### Feature Analysis:
-* `feature_importance_overall.csv`: Model-specific feature importance rankings across all folds
-* `shap_feature_impact_analysis.csv`: Detailed SHAP statistics for each feature (recommended for reporting)
-* `shap_features_summary.txt`: Text summary based on SHAP values, not model-specific feature importance
+
+##### Model-Specific Feature Importance:
+* Feature importance directory (`feature_importance/`): Contains both fold-level and sample-level versions
+  * `feature_importance_values_fold.csv`: Fold-level importance (importance values are averaged within each fold first, then across folds)
+  * `feature_importance_values_sample.csv`: Sample-level importance (raw importance values from all samples combined, then averaged)
+  * `feature_importance_bar_fold.png`: Bar plot of top features by fold-level importance (more robust to outliers)
+  * `feature_importance_bar_sample.png`: Bar plot of top features by sample-level importance (captures full dataset impact)
+
 
 > **Note:** We recommend reporting SHAP results rather than feature importance rankings. SHAP values provide more reliable feature impact analysis with both magnitude and directionality information.
 
 #### Predictions:
-* `predictions_vs_actual_overall.csv`: Combined predictions from all folds
+* `predictions_vs_actual_overall.csv`: Combined predictions from all folds (with Correct column for classification tasks, residuals for regression)
 * `confusion_matrix_global.png`: Overall confusion matrix (classification only)
 * `density_actual_vs_pred_global.png`: Distribution of predictions vs actual values (regression only)
 
-#### SHAP Visualizations:
-* `shap_bar_top25pos_top25neg.png`: Top features by SHAP impact
-* `shap_beeswarm_colored_global.png`: SHAP value distribution across features
-* `shap_values_all_folds.csv`: Raw SHAP values for all samples across folds
-
-#### Logging:
+#### Logging and Documentation:
 * `DAFTAR-ML_run.log`: Combined console and file log of the entire run
+* `figures_explanation.txt`: Comprehensive descriptions of each visualization output
+* `config.json`: Complete record of all settings used for the analysis
 
 ### Per-Fold Results
 
 Each `fold_N` directory contains:
 
-* **Model Files:** Trained models (`best_model_fold_N.pkl`) and test predictions
-* **Evaluation:** Fold-specific visualizations and metrics
-* **Hyperparameter Tuning:** Optimization summaries and Optuna plots
+* **Model Files:**
+  * `best_model_fold_N.pkl`: Trained model for this fold
+  * `predictions_fold_N.csv`: Test set predictions for this fold
+  * `test_indices_fold_N.csv`: Sample indices used in test set
+
+* **Evaluation:**
+  * `shap_values_fold_N.csv`: SHAP values specific to this fold
+  * `metrics_fold_N.json`: Performance metrics for this fold
+  * Fold-specific versions of global visualizations
+
+* **Hyperparameter Tuning:**
+  * `optuna_trials_fold_N.csv`: All hyperparameter combinations tested
+  * `optuna_importance_fold_N.png`: Parameter importance plot
+  * `optuna_parallel_coordinate_fold_N.png`: Parallel coordinates visualization
 
 ### Performance Evaluation Metrics
 

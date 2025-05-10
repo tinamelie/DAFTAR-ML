@@ -2,17 +2,25 @@
 
 import numpy as np
 import optuna
-import warnings
+from datetime import datetime
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from xgboost import XGBRegressor
+import xgboost as xgb
 import shap
 
 from daftar.models.base import BaseRegressionModel
 from daftar.core.callbacks import RelativeEarlyStoppingCallback
+from daftar.utils.warnings import suppress_xgboost_warnings
+
+# Suppress specific XGBoost warnings globally
+suppress_xgboost_warnings()
 
 
 class XGBoostRegressionModel(BaseRegressionModel):
     """XGBoost regression implementation."""
+    
+    def _get_timestamp(self):
+        """Format timestamp for logging."""
+        return datetime.now().strftime("%H:%M:%S")
     
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
         """Fit XGBoost regression model with hyperparameter optimization.
@@ -21,23 +29,18 @@ class XGBoostRegressionModel(BaseRegressionModel):
             X: Feature matrix
             y: Target vector
         """
-        # Suppress ALL XGBoost warnings for a cleaner output
-        warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
-        def objective(trial):
+        def objective_func(trial):
             params = {
                 'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
-                'max_depth': trial.suggest_int('max_depth', 3, 10),
-                'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.1, log=True),
+                'max_depth': trial.suggest_int('max_depth', 3, 12),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+                'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+                'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
                 'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
-                'subsample': trial.suggest_float('subsample', 0.6, 1.0),
-                'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
-                'gamma': trial.suggest_float('gamma', 1e-3, 1.0, log=True),
-                'random_state': self.seed,
-                'n_jobs': self.n_jobs,
-                'use_label_encoder': False  # Add this to suppress warnings
+                'random_state': self.seed
             }
             
-            model = XGBRegressor(**params)
+            model = xgb.XGBRegressor(**params)
             model.fit(X, y)
             y_pred = model.predict(X)
             
@@ -49,9 +52,7 @@ class XGBoostRegressionModel(BaseRegressionModel):
                 return np.abs(y - y_pred).mean()
             else:  # r2
                 return -1 * (1 - ((y - y_pred) ** 2).sum() / ((y - y.mean()) ** 2).sum())
-                
-            return score
-
+        
         # Set environment variables to help callbacks know which metrics to display properly
         import os
         os.environ['DAFTAR-ML_PROBLEM_TYPE'] = 'regression'
@@ -63,41 +64,54 @@ class XGBoostRegressionModel(BaseRegressionModel):
             relative_threshold=self.relative_threshold
         )
         
-        # Replace Optuna's logging to show correct metric signs
-        # Since we're negating metrics like r2 for optimization, we need to fix the display values
-        import logging
-        logging.getLogger("optuna").setLevel(logging.ERROR)  # Suppress default output
-        
         # Run optimization
         study = optuna.create_study(direction='minimize')
         
-        # Custom callback to intercept and reformat Optuna's output
-        def log_trial_callback(study, trial):
-            # For r2 metric, use absolute values for display
-            if self.metric == 'r2':
-                value_to_display = abs(trial.value)
-                best_value_to_display = abs(study.best_value)
-            else:
-                value_to_display = trial.value
-                best_value_to_display = study.best_value
+        # Override Optuna's default callbacks to use our custom reporting
+        def callback(study, trial):
+            # For metrics that should naturally be positive (r2), convert negatives to positives
+            # For metrics that should be minimized (mse, rmse, mae), preserve the original sign
             
-            if trial.number == 0:
-                print(f"[I {self._get_timestamp()}] Trial {trial.number} finished with value: {value_to_display} " + 
-                      f"and parameters: {trial.params}. Best is trial {trial.number} with value: {value_to_display}.")
+            # Get raw values
+            raw_trial_value = trial.value
+            raw_best_value = study.best_value
+            
+            # Convert to display values with correct sign
+            if self.metric == 'r2':
+                # For r2, show the POSITIVE value (flip the negative optimization value)
+                trial_display_value = -raw_trial_value
+                best_display_value = -raw_best_value
             else:
-                print(f"[I {self._get_timestamp()}] Trial {trial.number} finished with value: {value_to_display} " + 
-                      f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {best_value_to_display}.")
-        
+                # For MSE, RMSE, MAE - use actual values (already positive)
+                trial_display_value = raw_trial_value
+                best_display_value = raw_best_value
+            
+            # Format timestamp for logging
+            timestamp = self._get_timestamp()
+            
+            # Print appropriate message
+            if trial.number == study.best_trial.number:
+                print(f"[I {timestamp}] Trial {trial.number} finished with value: {trial_display_value} " +
+                      f"and parameters: {trial.params}. Best is trial {trial.number} with value: {trial_display_value}.")
+            else:
+                print(f"[I {timestamp}] Trial {trial.number} finished with value: {trial_display_value} " +
+                      f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {best_display_value}.")
+                      
+            # Call the early stopping callback
+            early_stopping(study, trial)
+                      
         study.optimize(
-            objective,
+            objective_func,
             n_trials=self.n_trials,
-            callbacks=[early_stopping, log_trial_callback]
+            callbacks=[callback]
         )
         
         # Store study for visualization
         self.study = study
         
-        self.model = XGBRegressor(**study.best_params)
+        # Get best params and fit final model
+        best_params = study.best_params.copy()
+        self.model = xgb.XGBRegressor(**best_params)
         self.model.fit(X, y)
         
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -126,11 +140,4 @@ class XGBoostRegressionModel(BaseRegressionModel):
             SHAP values
         """
         explainer = shap.TreeExplainer(self.model)
-        # Create shap values - this matches the original implementation
-        # and ensures the output is compatible with the viz code
         return explainer.shap_values(X)
-        
-    def _get_timestamp(self):
-        """Get current timestamp in format used by Optuna."""
-        import datetime
-        return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]

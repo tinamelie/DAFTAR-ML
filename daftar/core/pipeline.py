@@ -1,6 +1,6 @@
 """Pipeline implementation for DAFTAR-ML.
 
-This module provides the main pipeline implementation that orchestrates the
+This module provides the main pipeline implementation that runs the
 model training, evaluation, and analysis process.
 """
 
@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import RepeatedKFold, KFold
+from sklearn.model_selection import RepeatedKFold, KFold, RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score,
@@ -24,58 +24,24 @@ from sklearn.metrics import (
 )
 
 from daftar.core.config import Config
+from daftar.core.logging_utils import setup_logging
+from daftar.core.data_processing import prepare_data, init_dataset
+from daftar.core.evaluation import calculate_overall_metrics, save_metrics, make_serializable
+from daftar.utils.file_utils import create_figures_explanation, save_shap_values
+
 from daftar.models.base import BaseModel, BaseRegressionModel, BaseClassificationModel
 from daftar.models.regression.xgboost import XGBoostRegressionModel
 from daftar.models.regression.random_forest import RandomForestRegressionModel
 from daftar.models.classification.xgboost import XGBoostClassificationModel
 from daftar.models.classification.random_forest import RandomForestClassificationModel
 
-# Import visualization functions from original DAFTAR-ML modules
+# Import visualization functions
 from daftar.viz.core_plots import create_shap_summary, create_feature_importance, create_prediction_analysis
 from daftar.viz.optuna import save_optuna_visualizations
 from daftar.viz.shap import save_mean_shap_analysis
 from daftar.viz.feature_importance import plot_feature_importance_bar, save_feature_importance_values
 from daftar.viz.predictions import generate_density_plots, save_fold_predictions_vs_actual, save_top_features_summary
-
-
-def setup_logging(output_dir=None):
-    """Set up logging configuration.
-    
-    Args:
-        output_dir: Optional directory to write log file to
-    """
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    
-    # Clear existing handlers
-    if logger.handlers:
-        for handler in logger.handlers[:]:
-            logger.removeHandler(handler)
-    
-    # Create formatter
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    
-    # Add console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    
-    # Add file handler if output directory is provided
-    if output_dir:
-        try:
-            output_dir = os.path.abspath(output_dir)
-            # IMPORTANT: Do NOT create the directory here with os.makedirs
-            # This directory must have been validated and created before
-            # we get here, or else we risk creating directories we don't want
-            log_file = os.path.join(output_dir, 'DAFTAR-ML_run.log')
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-            logger.info(f"Logging to file: {log_file}")
-        except Exception as e:
-            logger.warning(f"Failed to set up file logging: {e}")
-    
-    return logger
+from daftar.viz.colors import FEATURE_IMPORTANCE_BAR_COLOR, FEATURE_IMPORTANCE_BAR_BG
 
 
 class Pipeline:
@@ -89,8 +55,11 @@ class Pipeline:
         """
         self.config = config
         
-        # First set up ONLY console logging without any file output
-        self.logger = setup_logging(None)
+        # Configure Optuna logging to ensure it's captured properly
+        import logging
+        optuna_logger = logging.getLogger("optuna")
+        optuna_logger.setLevel(logging.INFO)
+        optuna_logger.propagate = True
         
         # Calculate expected output path WITHOUT creating anything yet
         auto_name = config.get_auto_name()
@@ -114,6 +83,9 @@ class Pipeline:
                 pass  # Just continue if we can't check
                 
             if entries and not config.force_overwrite:
+                # First set up simple console logging for error reporting
+                self.logger = setup_logging(None, config.verbose if hasattr(config, 'verbose') else False)
+                
                 error_msg = f"Output directory already exists and contains files: {output_path}\n"
                 error_msg += f"Use --force flag to overwrite existing files.\n\n"
                 # Only include required parameters in the example
@@ -131,8 +103,8 @@ class Pipeline:
         output_path.mkdir(parents=True, exist_ok=True)
         self.output_dir = output_path
         
-        # Now we can safely add file logging since we've validated the directory
-        self.logger = setup_logging(self.output_dir)
+        # Set up logging with file output now that we have a valid directory
+        self.logger = setup_logging(self.output_dir, config.verbose if hasattr(config, 'verbose') else False)
         self.model = None
         
     def run(self) -> Dict[str, Any]:
@@ -166,52 +138,12 @@ class Pipeline:
         Returns:
             Tuple of (feature matrix, target vector, feature names)
         """
-        # Load data
-        self.logger.info(f"Loading data from {self.config.input_file}")
-        try:
-            data = pd.read_csv(self.config.input_file)
-        except Exception as e:
-            self.logger.error(f"Error loading data: {str(e)}")
-            raise
+        # Use the prepare_data function from data_processing module
+        X, y, feature_names, original_data = prepare_data(self.config)
         
-        # Initialize dataset
-        return self._init_dataset(data)
-    
-    def _init_dataset(
-        self, data: pd.DataFrame, feature_names: List[str] = None
-    ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-        """Initialize the dataset.
-        
-        Args:
-            data: Input DataFrame with features and target
-            feature_names: Optional list of feature names
-            
-        Returns:
-            Tuple of (X, y, feature_names)
-        """
-        # Get target and ID column
-        if self.config.target not in data.columns:
-            raise ValueError(f"Target column '{self.config.target}' not found in data")
-        
-        # Store original data with IDs for later reference
-        if self.config.id_column and self.config.id_column in data.columns:
-            # Make a copy of the original data with index set to match the dataset
-            self.original_data = data.copy().reset_index(drop=True)
-            # Remove ID column from working data
-            data = data.drop(columns=[self.config.id_column])
-        
-        # Split features and target
-        y = data[self.config.target].values
-        X = data.drop(columns=[self.config.target])
-        
-        # Get feature names
-        if feature_names is None:
-            feature_names = X.columns.tolist()
-        
-        # Convert to numpy arrays
-        X = X.values
-        
-        # Note: All transformations are now applied during preprocessing
+        # Store original data if available
+        if original_data is not None:
+            self.original_data = original_data
         
         return X, y, feature_names
     
@@ -288,6 +220,17 @@ class Pipeline:
         total_folds = self.config.outer_folds * self.config.repeats
         
         # Configure outer cross-validation
+        use_stratified = self.config.problem_type == 'classification' and self.config.use_stratified
+        
+        if use_stratified:
+            self.logger.info("Using StratifiedKFold for classification task")
+            cv = RepeatedStratifiedKFold(
+                n_splits=self.config.outer_folds,
+                n_repeats=self.config.repeats,
+                random_state=self.config.seed
+            )
+        else:
+            self.logger.info(f"Using KFold for {'classification' if self.config.problem_type == 'classification' else 'regression'} task")
         cv = RepeatedKFold(
             n_splits=self.config.outer_folds,
             n_repeats=self.config.repeats,
@@ -295,7 +238,7 @@ class Pipeline:
         )
         
         # Loop through outer folds
-        for train_idx, test_idx in cv.split(X):
+        for train_idx, test_idx in cv.split(X, y):
             fold_idx += 1
             self.logger.info(f"Processing fold {fold_idx}/{total_folds}")
             
@@ -304,13 +247,14 @@ class Pipeline:
             fold_results.append(fold_result)
             fold_metrics.append(fold_result['metrics'])
             
+            # Only log fold completion once
             self.logger.info(f"Completed fold {fold_idx}")
             
             # Clean up to reduce memory usage
             gc.collect()
         
-        # Calculate overall metrics
-        metrics = self._calculate_overall_metrics(fold_metrics)
+        # Calculate overall metrics using the imported function
+        metrics = calculate_overall_metrics(fold_metrics)
         
         return {
             'fold_results': fold_results,
@@ -374,20 +318,40 @@ class Pipeline:
             }
             # Add ROC AUC if model supports predict_proba
             if hasattr(model, 'predict_proba'):
-                y_prob = model.predict_proba(X_test)
-                if y_prob.shape[1] == 2:  # Binary classification
-                    metrics['roc_auc'] = roc_auc_score(y_test, y_prob[:, 1])
+                try:
+                    # For multiclass problems, use 'ovr' (one-vs-rest) strategy
+                    if len(np.unique(y_test)) > 2:
+                        # For multiclass, use OVR approach
+                        metrics['roc_auc'] = roc_auc_score(y_test, y_prob, multi_class='ovr')
+                    else:
+                        # For binary classification
+                        y_prob_positive = y_prob[:, 1] if y_prob.shape[1] > 1 else y_prob.ravel()
+                        metrics['roc_auc'] = roc_auc_score(y_test, y_prob_positive)
+                except Exception as e:
+                    # Still catch any other errors that might occur
+                    self.logger.warning(f"Could not calculate ROC AUC: {e}")
         
-        # Get feature importance
-        feature_importances = model.feature_importances_
+        # Get feature importances
+        if hasattr(model, 'feature_importances_'):
+            feature_importances = model.feature_importances_
+        else:
+            # Some models might not have this attribute, provide zeros as fallback
+            feature_importances = np.zeros(len(feature_names))
         
-        # Calculate SHAP values
-        shap_values = model.shap_values(X_test)
+        # Get SHAP values if model supports it
+            shap_values = None
+        if hasattr(model, 'shap_values'):
+            try:
+                # Create DataFrame for SHAP values calculation (for better visualization)
+                X_test_df = pd.DataFrame(X_test, columns=feature_names)
+                shap_values = model.shap_values(X_test)
+            except Exception as e:
+                self.logger.warning(f"Could not calculate SHAP values for fold {fold_idx}: {e}")
+                X_test_df = None
+        else:
+            X_test_df = None
         
-        # Convert to DataFrame for SHAP analysis
-        X_test_df = pd.DataFrame(X_test, columns=feature_names)
-        
-        # Save Optuna visualizations
+        # Create plots for this fold
         if hasattr(model, 'study'):
             save_optuna_visualizations(model.study, fold_idx, output_dir, self.config)
         
@@ -397,8 +361,8 @@ class Pipeline:
             pickle.dump(model, f)
         print(f"[Fold {fold_idx}] Best model saved to {model_path}")
         
-        # Log completion
-        self.logger.info(f"Completed fold {fold_idx}")
+        # Log completion is already done in the main loop
+        # so we don't need to duplicate it here
         
         # Create IDs (we don't have real IDs, so use indices)
         ids = test_idx.tolist()
@@ -414,6 +378,12 @@ class Pipeline:
         # Create fold-wise predictions vs actual CSV
         out_csv = fold_dir / f"predictions_vs_actual_fold_{fold_idx}.csv"
         save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, output_dir, original_ids=original_ids)
+        
+        # NEW: Generate fold distribution histograms
+        self._create_fold_distribution_histogram(fold_idx, y_train, y_test, fold_dir)
+        
+        # NEW: Save text file with samples in this fold
+        self._save_fold_samples_list(fold_idx, train_idx, test_idx, y, fold_dir, original_ids)
         
         # Return results
         result = {
@@ -439,31 +409,128 @@ class Pipeline:
             
         return result
     
-    def _calculate_overall_metrics(self, fold_metrics: List[Dict[str, float]]) -> Dict[str, float]:
-        """Calculate overall metrics across all folds.
+    def _create_fold_distribution_histogram(self, fold_idx: int, y_train: np.ndarray, y_test: np.ndarray, fold_dir: Path) -> None:
+        """Create histogram visualizations showing train/test data distribution for a fold.
         
         Args:
-            fold_metrics: List of metrics dictionaries from each fold
-            
-        Returns:
-            Dictionary of overall metrics
+            fold_idx: Index of current fold
+            y_train: Training set target values
+            y_test: Test set target values
+            fold_dir: Directory to save the histogram
         """
-        # Initialize overall metrics
-        if not fold_metrics:
-            return {}
+        # Convert numpy arrays to pandas Series for easier handling
+        train_series = pd.Series(y_train)
+        test_series = pd.Series(y_test)
         
-        overall_metrics = {}
+        # Determine if this is a classification or regression problem
+        is_classification = self.config.problem_type == 'classification'
         
-        # Get all metric names from first fold
-        metric_names = fold_metrics[0].keys()
+        # Create a figure for the combined histogram
+        plt.figure(figsize=(10, 6))
         
-        # Calculate mean and std for each metric
-        for metric in metric_names:
-            metric_values = [fold[metric] for fold in fold_metrics]
-            overall_metrics[metric] = np.mean(metric_values)
-            overall_metrics[f"{metric}_std"] = np.std(metric_values)
+        # Get colors for train/test from the central color management
+        from daftar.viz.colors import get_train_test_colors
+        colors = get_train_test_colors()
         
-        return overall_metrics
+        if is_classification:
+            # For classification, combine train and test data
+            combined_data = pd.concat([
+                pd.DataFrame({"y": train_series, "Set": "Train"}),
+                pd.DataFrame({"y": test_series, "Set": "Test"})
+            ])
+            
+            # Create countplot with our colors
+            ax = sns.countplot(x="y", hue="Set", data=combined_data, palette=colors)
+            
+            # Remove "Set" from legend - just show Train and Test
+            handles, _ = ax.get_legend_handles_labels()
+            ax.legend(handles, ["Train", "Test"])
+            
+            plt.xlabel("Class")
+            plt.ylabel("Count")
+        else:
+            # For regression, calculate optimal bins based on combined data
+            combined_data = pd.concat([train_series, test_series])
+            
+            # Calculate better binning for continuous data
+            data_range = combined_data.max() - combined_data.min()
+            n_samples = len(combined_data)
+            # Use Freedman-Diaconis rule as a starting point
+            bin_width = 2 * (combined_data.quantile(0.75) - combined_data.quantile(0.25)) / (n_samples**(1/3))
+            if bin_width > 0:
+                n_bins = max(10, min(50, int(data_range / bin_width)))
+            else:
+                n_bins = 20  # Fallback if bin_width calculation fails
+            
+            # Create histograms with calculated number of bins
+            plt.hist(train_series, bins=n_bins, alpha=0.7, label="Train", color=colors["Train"])
+            plt.hist(test_series, bins=n_bins, alpha=0.7, label="Test", color=colors["Test"])
+            
+            plt.xlabel("Target Value")
+            plt.ylabel("Frequency")
+            plt.legend()
+        
+        plt.title(f"Fold {fold_idx} - Train/Test Distribution")
+        plt.tight_layout()
+        
+        # Save the plot to the fold directory
+        hist_path = fold_dir / f"fold_{fold_idx}_distribution.png"
+        plt.savefig(hist_path)
+        plt.close()
+        
+        print(f"[Fold {fold_idx}] Distribution histogram saved to {hist_path}")
+    
+    def _save_fold_samples_list(self, fold_idx: int, train_idx: np.ndarray, test_idx: np.ndarray, 
+                                y: np.ndarray, fold_dir: Path, original_ids=None) -> None:
+        """Save a CSV file listing which samples were included in the fold.
+        
+        Args:
+            fold_idx: Index of current fold
+            train_idx: Indices of training samples
+            test_idx: Indices of test samples
+            y: Target values
+            fold_dir: Directory to save the file
+            original_ids: Original sample IDs if available
+        """
+        # Get original sample IDs if available
+        all_ids = []
+        if hasattr(self, 'original_data') and self.config.id_column in getattr(self, 'original_data', pd.DataFrame()).columns:
+            # Use original IDs from dataset
+            all_ids = self.original_data[self.config.id_column].tolist()
+        else:
+            # Create sequential IDs if none available
+            all_ids = [f"Sample_{i}" for i in range(len(y))]
+        
+        # Create DataFrames for training and test sets
+        train_data = []
+        test_data = []
+        
+        for idx in train_idx:
+            sample_id = all_ids[idx] if idx < len(all_ids) else f"Sample_{idx}"
+            target_val = y[idx]
+            train_data.append({
+                'ID': sample_id,
+                'Target_Value': target_val,
+                'Set': 'Train'
+            })
+            
+        for idx in test_idx:
+            sample_id = all_ids[idx] if idx < len(all_ids) else f"Sample_{idx}"
+            target_val = y[idx]
+            test_data.append({
+                'ID': sample_id,
+                'Target_Value': target_val,
+                'Set': 'Test'
+            })
+        
+        # Combine into a single DataFrame
+        fold_samples = pd.DataFrame(train_data + test_data)
+        
+        # Save to CSV
+        samples_file = fold_dir / f"fold_{fold_idx}_samples.csv"
+        fold_samples.to_csv(samples_file, index=False)
+        
+        print(f"[Fold {fold_idx}] Samples list saved to {samples_file}")
     
     def _analyze_results(
         self, results: Dict[str, Any], X: np.ndarray,
@@ -491,20 +558,12 @@ class Pipeline:
         for metric in results['fold_metrics'][0].keys():
             overall_metrics[metric] = np.mean([m[metric] for m in results['fold_metrics']])
         
-        # Save performance metrics
-        metrics_file = self._save_metrics(overall_metrics, results['fold_metrics'], output_dir)
+        # Save performance metrics using the imported function
+        metrics_file = save_metrics(overall_metrics, results['fold_metrics'], output_dir)
         output_files['metrics'] = metrics_file
         
         # Generate basic visualizations
         self.logger.info("Generating basic visualizations...")
-        
-        # Don't create SHAP summary plot anymore as requested - but track file
-        shap_summary_path = output_dir / 'shap_summary.png'
-        output_files['shap_summary'] = str(shap_summary_path)
-        
-        # Don't create feature importance plot anymore as requested - but track file
-        feat_imp_path = output_dir / 'feature_importance.png'
-        output_files['feature_importance'] = str(feat_imp_path)
         
         # Collect all true values and predictions from fold results
         all_true_values = []
@@ -528,17 +587,34 @@ class Pipeline:
         # Feature importance
         self.logger.info("Saving feature importance values...")
         # Save per-fold feature importance values in their respective fold directories
-        # And save consolidated overall values in main output dir
-        overall_df = save_feature_importance_values(results['fold_results'], output_dir, in_fold_dirs=True)
-        output_files['feature_importance_values'] = str(output_dir / 'feature_importance_overall.csv')
+        # Creates both fold-level and sample-level versions in feature_importance dir
+        fold_level_df, sample_level_df = save_feature_importance_values(results['fold_results'], output_dir, in_fold_dirs=True)
+        
+        # Track output files
+        feature_importance_dir = output_dir / "feature_importance"
+        output_files['feature_importance_values_fold'] = str(feature_importance_dir / 'feature_importance_values_fold.csv')
+        output_files['feature_importance_values_sample'] = str(feature_importance_dir / 'feature_importance_values_sample.csv')
+        output_files['feature_importance_values'] = str(output_dir / 'feature_importance_overall.csv')  # Legacy path
         
         # Save per-fold and concatenated SHAP values as CSV files
-        self._save_shap_values(results['fold_results'], output_dir)
+        save_shap_values(results['fold_results'], output_dir)
         
-        # Create feature importance bar plot
-        imp_bar_path = output_dir / 'feature_importance_bar.png'
-        plot_feature_importance_bar(overall_df, output_dir, self.config.top_n, bar_color="#968FF3", bar_opacity=1.0, bg_color="#E6E6E6")
-        output_files['feature_importance_bar'] = str(imp_bar_path)
+        # Create fold-level feature importance bar plot
+        self.logger.info("Creating fold-level feature importance bar plot...")
+        plot_feature_importance_bar(fold_level_df, output_dir, self.config.top_n, 
+                                   bar_color=FEATURE_IMPORTANCE_BAR_COLOR, bar_opacity=1.0, bg_color=FEATURE_IMPORTANCE_BAR_BG, 
+                                   plot_type="fold")
+        
+        # Create sample-level feature importance bar plot
+        self.logger.info("Creating sample-level feature importance bar plot...")
+        plot_feature_importance_bar(sample_level_df, output_dir, self.config.top_n, 
+                                   bar_color=FEATURE_IMPORTANCE_BAR_COLOR, bar_opacity=1.0, bg_color=FEATURE_IMPORTANCE_BAR_BG, 
+                                   plot_type="sample")
+        
+        # Track all feature importance bar plots
+        output_files['feature_importance_bar'] = str(output_dir / 'feature_importance_bar.png')  # Legacy path
+        output_files['feature_importance_bar_fold'] = str(feature_importance_dir / 'feature_importance_bar_fold.png')
+        output_files['feature_importance_bar_sample'] = str(feature_importance_dir / 'feature_importance_bar_sample.png')
         
         # Generate predictions vs actual and density plots (density only for regression)
         if self.config.problem_type == "regression":
@@ -551,18 +627,23 @@ class Pipeline:
         # Call function for both classification and regression
         # For classification, it will only generate confusion matrices
         # For regression, it will generate density plots
+        
+        # Get confusion matrix colormap from config if available
+        confusion_cmap = getattr(self.config, 'confusion_cmap', None)
+        
         generate_density_plots(
             fold_results=results['fold_results'],
             all_true_values=all_true_values,
             all_predictions=all_predictions,
             output_dir=output_dir,
             target_name=self.config.target,
-            problem_type=self.config.problem_type
+            problem_type=self.config.problem_type,
+            cmap=confusion_cmap
         )
         
         # Create figures explanation file
         explanation_path = output_dir / "figures_explanation.txt"
-        self._create_figures_explanation(output_dir)
+        create_figures_explanation(output_dir)
         output_files['figures_explanation'] = str(explanation_path)
         
         # Save analysis summary
@@ -572,239 +653,6 @@ class Pipeline:
         return {
             'metrics': overall_metrics,
             'output_files': output_files,
-            'shap_analysis': shap_df.to_dict(),
-            'feature_importance': overall_df.to_dict()
+            'shap_analysis': shap_df.to_dict() if shap_df is not None else {},
+            'feature_importance': fold_level_df.to_dict() if 'fold_level_df' in locals() and fold_level_df is not None else {}
         }
-        
-    def _save_shap_values(self, fold_results: List[Dict[str, Any]], output_dir: Path) -> None:
-        """Save SHAP values from all folds to CSV files.
-        
-        Args:
-            fold_results: List of fold results
-            output_dir: Output directory path
-        """
-        # Concatenate SHAP values from all folds
-        all_samples_shap_values = []
-        
-        for fold_idx, fold_result in enumerate(fold_results):
-            shap_values = fold_result['shap_values']
-            X_test = fold_result['X_test']
-            y_test = fold_result['y_test']
-            feature_names = fold_result['feature_importances'].index.tolist()
-            
-            # Use original IDs if available, otherwise use test IDs
-            if 'original_ids' in fold_result and fold_result['original_ids'] is not None:
-                sample_ids = fold_result['original_ids']
-            else:
-                sample_ids = fold_result['ids_test']
-            
-            # Skip if no SHAP values (shouldn't happen)
-            if shap_values is None or len(shap_values) == 0:
-                continue
-                
-            # Handle different SHAP value shapes based on problem type
-            # Classification models can have multiple formats based on the SHAP explainer
-            if len(shap_values.shape) == 3:  # shape: (n_classes, n_samples, n_features)
-                # For multiclass, we'll just use the values for class 1 (positive class)
-                shap_values = shap_values[1]  # Select positive class SHAP values
-            
-            # Make sure we don't exceed the bounds of arrays
-            n_samples = min(len(shap_values), len(sample_ids), len(y_test))
-            
-            # For each sample, collect all feature SHAP values
-            for i in range(n_samples):
-                sample_id = sample_ids[i]
-                target_value = y_test[i]
-                sample_shap = shap_values[i]
-                
-                # Handle feature dimension safely
-                n_features = min(len(sample_shap), len(feature_names))
-                
-                # Store all SHAP values for this sample
-                sample_shap_dict = {feature_names[j]: sample_shap[j] for j in range(n_features)}
-                
-                # Add metadata
-                sample_shap_dict['ID'] = sample_id  # Use a consistent ID column name
-                sample_shap_dict['Fold'] = fold_idx + 1  # 1-indexed folds
-                sample_shap_dict['Target'] = target_value  # Add target value
-                
-                # Append to the list of samples
-                all_samples_shap_values.append(sample_shap_dict)
-        
-        # Create DataFrame with one row per sample, features as columns
-        shap_df = pd.DataFrame(all_samples_shap_values)
-        
-        # Reorder columns to put ID, Fold, and Target first
-        metadata_cols = ['ID', 'Fold', 'Target']
-        other_cols = [col for col in shap_df.columns if col not in metadata_cols]
-        ordered_cols = metadata_cols + other_cols
-        shap_df = shap_df[ordered_cols]
-        
-        # Save to CSV
-        shap_df.to_csv(output_dir / 'shap_values_all_folds.csv', index=False)
-        
-        # Save per-fold SHAP values
-        for fold_idx, fold_result in enumerate(fold_results):
-            fold_dir = output_dir / f"fold_{fold_idx+1}"
-            fold_dir.mkdir(exist_ok=True)
-            
-            # Filter for this fold
-            fold_shap_df = shap_df[shap_df['Fold'] == fold_idx + 1].copy()
-            # Use the same column ordering as the main SHAP CSV
-            fold_shap_df.to_csv(fold_dir / f"shap_values_fold_{fold_idx+1}.csv", index=False)
-    
-    def _create_figures_explanation(self, output_dir: Path) -> None:
-        """Create explanation file for all figures.
-        
-        Args:
-            output_dir: Output directory path
-        """
-        explanation_text = [
-            "FIGURES EXPLANATION",
-            "=" * 50,
-            "",
-            "This document explains the various figures generated by DAFTAR-ML.",
-            "",
-            "1. SHAP Summary Plot (shap_summary.png)",
-            "-" * 50,
-            "The SHAP summary plot shows the impact of each feature on the model output.",
-            "Features are ranked by their mean absolute SHAP value.",
-            "Each point represents a sample, with color indicating the feature value (red=high, blue=low).",
-            "Points to the right indicate positive impact on the prediction, left indicates negative impact.",
-            "",
-            "2. Feature Importance Plot (feature_importance.png)",
-            "-" * 50,
-            "This bar chart shows the importance of each feature according to the model.",
-            "Features are ranked by their mean importance across all cross-validation folds.",
-            "Error bars indicate the standard deviation of importance across folds.",
-            "",
-
-            "4. Global Density Plot (density_actual_vs_pred_global.png)",
-            "-" * 50,
-            "Distribution of actual vs. predicted values across all folds.",
-            "Includes metrics (MAE, MSE, RMSE, R2) in the right margin.",
-            "",
-            "5. SHAP Beeswarm Plot (shap_beeswarm_colored_global.png)",
-            "-" * 50,
-            "This plot shows the distribution of SHAP values for each feature.",
-            "Each point represents a sample, with color indicating the feature value.",
-            "Features are ordered by their mean absolute SHAP value.",
-            "",
-            "6. SHAP Bar Plots (shap_bar_top25pos_top25neg.png)",
-            "-" * 50,
-            "This bar chart shows the top 25 features with positive impact and top 25 with negative impact.",
-            "Features are ranked by their mean SHAP value across all samples.",
-            "Error bars indicate the standard deviation of SHAP values across folds.",
-            "",
-            "7. SHAP-Target Correlation (shap_corr_bar_top25pos_top25neg.png) - Regression Only",
-            "-" * 50,
-            "This bar chart shows the correlation between SHAP values and the target variable (generated only for regression problems).",
-            "Features with high positive correlation have SHAP values that align well with the target.",
-            "Features with high negative correlation have SHAP values that inversely align with the target.",
-            "",
-            "8. Feature Importance Bar (feature_imp_bar_top25.png)",
-            "-" * 50,
-            "This bar chart shows the top 25 features by importance.",
-            "Features are ranked by their mean importance across all folds.",
-            "Error bars indicate the standard deviation of importance across folds.",
-            "",
-            "9. Optuna Plots (in fold_X/optuna_plots/)",
-            "-" * 50,
-            "- optuna_history_foldX.html: Optimization history showing how the objective value improved over trials.",
-            "- optuna_parallel_foldX.html: Parallel coordinate plot showing the relationship between hyperparameters and objective value.",
-            "- optuna_slice_foldX.html: Slice plot showing the effect of each hyperparameter on the objective value.",
-            "",
-            "10. CSV Files",
-            "-" * 50,
-            "- predictions_vs_actual_overall.csv: Contains all predictions, actual values, and residuals.",
-            "- fold_X/predictions_vs_actual_fold_X.csv: Contains predictions for each fold.",
-            "- feature_importance_overall.csv: Contains mean and std of feature importance across folds.",
-            "- shap_feature_impact_analysis.csv: Contains comprehensive SHAP statistics for all features.",
-        ]
-        
-        with open(output_dir / "figures_explanation.txt", "w") as f:
-            f.write("\n".join(explanation_text))
-    
-    def _save_metrics(self, metrics: Dict, fold_metrics: List[Dict], output_dir: Path) -> str:
-        """
-        Save overall and per-fold metrics to a text file.
-        
-        Args:
-            metrics: Overall metrics dictionary
-            fold_metrics: List of per-fold metrics dictionaries
-            output_dir: Output directory path
-            
-        Returns:
-            Path to the created metrics text file
-        """
-        # Save metrics to JSON
-        metrics_file = output_dir / "metrics.json"
-        with open(metrics_file, "w") as f:
-            json.dump({"overall": metrics, "folds": fold_metrics}, f, indent=2)
-            
-        # Create performance.txt with readable format
-        txt_file = output_dir / "performance.txt"
-        with open(txt_file, "w") as f:
-            f.write("===== DAFTAR-ML Performance Metrics =====\n\n")
-            
-            # Overall metrics
-            f.write("Overall Performance Metrics\n")
-            f.write("------------------------\n")
-            f.write("These values represent the AVERAGE performance across all CV folds.\n")
-            f.write("Calculation method: Each metric is calculated for individual folds, then averaged.\n\n")
-            
-            # Overall metrics values
-            if 'mse' in metrics:
-                f.write(f"MSE:  {metrics['mse']:.7f}  (Mean Squared Error)\n")
-            if 'rmse' in metrics:
-                f.write(f"RMSE: {metrics['rmse']:.7f}  (Root Mean Squared Error)\n")
-            if 'mae' in metrics:
-                f.write(f"MAE:  {metrics['mae']:.7f}  (Mean Absolute Error)\n")
-            if 'r2' in metrics:
-                f.write(f"R2:   {metrics['r2']:.7f}  (Coefficient of Determination)\n")
-            if 'accuracy' in metrics:
-                f.write(f"Accuracy: {metrics['accuracy']:.7f}\n")
-            if 'f1' in metrics:
-                f.write(f"F1 Score: {metrics['f1']:.7f}\n")
-            if 'roc_auc' in metrics:
-                f.write(f"ROC AUC:  {metrics['roc_auc']:.7f}\n")
-            f.write("\n")
-            
-            # Per-fold metrics
-            f.write("Per-Fold Metrics\n")
-            f.write("---------------\n")
-            f.write("These values are calculated for each fold independently.\n\n")
-            
-            for i, fold_metric in enumerate(fold_metrics):
-                f.write(f"Fold {i+1}:\n")
-                for metric_name, metric_value in fold_metric.items():
-                    f.write(f"  {metric_name}:  {metric_value:.7f}\n")
-                f.write("\n")
-            
-        return str(metrics_file)
-        
-    def _make_serializable(self, obj):
-        """Convert numpy types to Python native types for JSON serialization.
-        
-        Args:
-            obj: Object to convert
-            
-        Returns:
-            Serializable object
-        """
-        if isinstance(obj, dict):
-            return {k: self._make_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._make_serializable(item) for item in obj]
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, pd.DataFrame):
-            return obj.to_dict(orient='records')
-        elif isinstance(obj, pd.Series):
-            return obj.to_dict()
-        else:
-            return obj
