@@ -232,11 +232,11 @@ class Pipeline:
             )
         else:
             self.logger.info(f"Using KFold for {'classification' if self.config.problem_type == 'classification' else 'regression'} task")
-            cv = RepeatedKFold(
-                n_splits=self.config.outer_folds,
-                n_repeats=self.config.repeats,
-                random_state=self.config.seed
-            )
+        cv = RepeatedKFold(
+            n_splits=self.config.outer_folds,
+            n_repeats=self.config.repeats,
+            random_state=self.config.seed
+        )
         
         # Loop through outer folds
         for train_idx, test_idx in cv.split(X, y):
@@ -334,7 +334,7 @@ class Pipeline:
         
         # Get feature importances
         if hasattr(model, 'feature_importances_'):
-            feature_importances = model.feature_importances_
+        feature_importances = model.feature_importances_
         else:
             # Some models might not have this attribute, provide zeros as fallback
             feature_importances = np.zeros(len(feature_names))
@@ -345,7 +345,7 @@ class Pipeline:
             try:
                 # Create DataFrame for SHAP values calculation (for better visualization)
                 X_test_df = pd.DataFrame(X_test, columns=feature_names)
-                shap_values = model.shap_values(X_test)
+        shap_values = model.shap_values(X_test)
             except Exception as e:
                 self.logger.warning(f"Could not calculate SHAP values for fold {fold_idx}: {e}")
                 X_test_df = None

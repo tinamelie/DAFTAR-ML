@@ -125,7 +125,7 @@ EXAMPLES:
         # Create filename with the task type
         # Use shorter classification abbreviation
         task_abbr = "classif" if args.task == "classification" else args.task
-        filename = f"{input_path.stem}_preprocessed_MI{args.k}_{task_abbr}{transform_suffix}{input_path.suffix}"
+        filename = f"{input_path.stem}_MI{args.k}_{task_abbr}{transform_suffix}{input_path.suffix}"
         
         # Determine output directory
         if args.output_dir:
