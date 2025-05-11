@@ -431,13 +431,13 @@ EXAMPLES:
         print("===========================================================")
         print("Option 1: Visualize CV splits and optimize them for data structure")
         print(f"  Default CV splits : ")
-        print(f"  daftar-cv --input {output_path} --id {args.id} --target {args.target} --output_dir {args.output_dir}")
+        print(f"  daftar-cv --input {output_path} --id {args.id} --target {args.target}{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print()
         print(f"  Custom CV parameters:")
-        print(f"  daftar-cv --input {output_path} --id {args.id} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir {args.output_dir}")
+        print(f"  daftar-cv --input {output_path} --id {args.id} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print()
         print("Option 2: Run the DAFTAR-ML pipeline with default settings")
-        print(f"  daftar --input {output_path} --target {args.target} --id {args.id} --model [xgb|rf] --output_dir {args.output_dir}")
+        print(f"  daftar --input {output_path} --target {args.target} --id {args.id} --model [xgb|rf]{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print("===========================================================\n")
         
         return 0
