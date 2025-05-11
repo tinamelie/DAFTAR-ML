@@ -451,11 +451,11 @@ If you use DAFTAR-ML in academic work, please cite:
 
 ```
 @software{daftar2025,
-  author  = {Melie, T.},
+  author  = {The DAFTAR-ML Team},
   title   = {DAFTAR-ML},
   year    = {2025},
   url     = {https://github.com/tinamelie/DAFTAR-ML},
-  version = {v0.1.1}
+  version = {v0.1.2}
 }
 ```
 

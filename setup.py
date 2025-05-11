@@ -30,9 +30,9 @@ description = (
 setup(
     name="daftar-ml",
     version=about.get("__version__", "0.1.2"),
-    author="Melie",
+    author="Tina Melie",
     author_email="drtinamelie@gmail.com",
-    url="https://github.com/tmelie/DAFTAR-ML",
+    url="https://github.com/tinamelie/DAFTAR-ML",
     description=description,
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
