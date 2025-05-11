@@ -2,7 +2,14 @@
  
 DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It supports both regression and classification tasks. DAFTAR-ML expects a single CSV file with one target column and any number of feature columns.
 
- Functionality Highlights:
+### Use Cases
+
+- **Gene-Phenotype Relationships**: Discover which genes correlate with specific phenotypes (e.g., growth on a substrate)
+- **Metabolite–Disease Biomarker Discovery**: Rank metabolites that distinguish healthy vs. diseased states or track treatment response.
+- **Drug-Response Prediction**: Identify the gene, transcript, or compound features that explain drug sensitivity or resistance.
+- **Non-biological examples here** 
+
+### Functionality Highlights:
 
 - Automates data preprocessing and feature selection via mutual information
 - Trains models with nested cross-validation 
@@ -10,29 +17,24 @@ DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **
 - Scores features using SHAPley Additive exPlanations (SHAP)
 - Generates publication-quality visualizations
 
-## Use Cases
-
-- **Gene-Phenotype Relationships**: Discover which genes correlate with specific phenotypes (e.g., growth on a substrate)
-- **Other examples here***
 
 ## Quick Start
 
 DAFTAR‑ML expects a comma‑separated file (csv) with:
 
 - id_column: Unique sample identifier
-
 - target_column: Continuous or categorical response
-
 - Features for prediction
+ 
 
- id_column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
+ id_column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_column &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
 | Species | **Growth_on_Galactose** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
 |----------|:---------------:|:-------------:|:-------------:|:-------------:|
 | Species1 |     **0.34**    |       10      |       0       |       15      |
 | Species2 |      **0**      |       8       |       1       |       6       |
 | Species3 |     **0.01**    |       0       |       4       |       3       |
 
-In this gene-phenotype example, we use gene clusters from tools like OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, is growth rates of species in galactose. The aim is to identify which gene clusters (**features**) are important to this **target**, i.e. which gene clusters are relevant to growth on galactose. 
+In this gene-phenotype example, we use gene clusters OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, is growth rates of species in galactose medium. The aim is to identify which gene clusters (**features**) are important to this **target**, i.e. which gene clusters are relevant to growth on galactose. 
 ### Results example (summary):
 | Rank |    Feature    |  SHAP Score |
 |------|:-------------:|:------:|
@@ -430,13 +432,13 @@ Anything specified on the CLI will override YAML values.
 
 ### Color Visualization Tool
 
-DAFTAR-ML includes a utility to display all the color palettes used in its visualizations. 
+DAFTAR-ML includes a utility to display all the color palettes used in its visualizations. Running the colors tool will show you the current color configuration and example plots. 
 
 ```bash
 daftar-colors --output_dir output_directory
 ```
 
-All DAFTAR-ML visualizations use a centralized color management system (in `daftar/viz/color_definitions.py`) to ensure consistent styling across all outputs.
+Colors are managed in `daftar/viz/color_definitions.py` - make any changes to the palette here. 
 
 
 ## Code Structure
