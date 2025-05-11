@@ -24,8 +24,6 @@ def process_sample_importances(sample_importances):
     Returns:
         DataFrame with processed sample-level importance statistics
     """
-    # This function would handle any preprocessing of sample-level importances
-    # From model-specific formats to a standardized DataFrame
     
     # If the input is already a DataFrame or can be converted to one
     if isinstance(sample_importances, pd.DataFrame):

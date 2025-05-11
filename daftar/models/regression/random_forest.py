@@ -85,13 +85,18 @@ class RandomForestRegressionModel(BaseRegressionModel):
             # Format timestamp for logging
             timestamp = self._get_timestamp()
             
-            # Print appropriate message
+            # Print appropriate message - Make sure values are positive for display
             if trial.number == study.best_trial.number:
-                print(f"[I {timestamp}] Trial {trial.number} finished with value: {trial_display_value} " +
-                      f"and parameters: {trial.params}. Best is trial {trial.number} with value: {trial_display_value}.")
+                # Make sure we're not showing negative values for minimization metrics (MSE, RMSE, MAE)
+                display_value = abs(trial_display_value) if self.metric in ['mse', 'rmse', 'mae'] else trial_display_value
+                print(f"[I {timestamp}] Trial {trial.number} finished with value: {display_value} " +
+                      f"and parameters: {trial.params}. Best is trial {trial.number} with value: {display_value}.")
             else:
-                print(f"[I {timestamp}] Trial {trial.number} finished with value: {trial_display_value} " +
-                      f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {best_display_value}.")
+                # Make sure we're not showing negative values for minimization metrics (MSE, RMSE, MAE)
+                display_value = abs(trial_display_value) if self.metric in ['mse', 'rmse', 'mae'] else trial_display_value
+                display_best = abs(best_display_value) if self.metric in ['mse', 'rmse', 'mae'] else best_display_value
+                print(f"[I {timestamp}] Trial {trial.number} finished with value: {display_value} " +
+                      f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {display_best}.")
                       
             # Call the early stopping callback
             early_stopping(study, trial)

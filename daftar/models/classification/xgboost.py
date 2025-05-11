@@ -108,11 +108,16 @@ class XGBoostClassificationModel(BaseClassificationModel):
             
             # Print appropriate message
             if trial.number == study.best_trial.number:
-                print(f"[I {timestamp}] Trial {trial.number} finished with value: {trial_display_value} " +
-                      f"and parameters: {trial.params}. Best is trial {trial.number} with value: {trial_display_value}.")
+                # Always show positive values for classification metrics (they're always maximized)
+                display_value = abs(trial_display_value) if trial_display_value < 0 else trial_display_value
+                print(f"[I {timestamp}] Trial {trial.number} finished with value: {display_value} " +
+                      f"and parameters: {trial.params}. Best is trial {trial.number} with value: {display_value}.")
             else:
-                print(f"[I {timestamp}] Trial {trial.number} finished with value: {trial_display_value} " +
-                      f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {best_display_value}.")
+                # Always show positive values for classification metrics (they're always maximized)
+                display_value = abs(trial_display_value) if trial_display_value < 0 else trial_display_value
+                display_best = abs(best_display_value) if best_display_value < 0 else best_display_value
+                print(f"[I {timestamp}] Trial {trial.number} finished with value: {display_value} " +
+                      f"and parameters: {trial.params}. Best is trial {study.best_trial.number} with value: {display_best}.")
                       
             # Call the early stopping callback
             early_stopping(study, trial)

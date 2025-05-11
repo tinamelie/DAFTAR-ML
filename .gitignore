@@ -1,3 +1,29 @@
-*ipynb_checkpoints*
-*egg-info*
-*__pycache__*
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local development settings
+.venv/
+.env
+.idea/
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Test directories and outputs
+test_cv_comp/
+test_daftar_comp/
+DAFTAR-ML_*/
+*_fold_*_samples.csv
+seed_test_report.txt
+CV_*_results/
+
+# Logs
+*.log

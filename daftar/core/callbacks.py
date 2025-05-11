@@ -65,15 +65,16 @@ class RelativeEarlyStoppingCallback:
         
         # Helper to format metric values based on magnitude for readability
         def fmt_metric(val: float) -> str:
+            # For display purposes, metrics should always be positive
             abs_val = abs(val)
             if abs_val >= 1000:
-                return f"{val:.0f}"
+                return f"{abs_val:.0f}" if val < 0 else f"{val:.0f}"
             elif abs_val >= 100:
-                return f"{val:.1f}"
+                return f"{abs_val:.1f}" if val < 0 else f"{val:.1f}"
             elif abs_val >= 1:
-                return f"{val:.4f}"
+                return f"{abs_val:.4f}" if val < 0 else f"{val:.4f}"
             else:
-                return f"{val:.6f}"
+                return f"{abs_val:.6f}" if val < 0 else f"{val:.6f}"
         
         # First trial
         if self.best_value is None:
@@ -88,11 +89,12 @@ class RelativeEarlyStoppingCallback:
             
             if is_max_metric:
                 # For maximization metrics, flip the sign (since we internally negate them)
-                display_value = -current_value  # Convert back to positive by negating
+                display_value = abs(current_value) if current_value < 0 else current_value  # Always show positive values
                 print(f"[Trial {current_trial_num}] First trial: Score = {fmt_metric(display_value)}, patience counter = 0/{self.patience}")
             else:
-                # For minimization metrics, use the value as is
-                print(f"[Trial {current_trial_num}] First trial: Score = {fmt_metric(current_value)}, patience counter = 0/{self.patience}")
+                # For minimization metrics, use the value as is but ensure it's positive for display
+                display_value = abs(current_value) if self.metric in ['mse', 'rmse', 'mae'] else current_value
+                print(f"[Trial {current_trial_num}] First trial: Score = {fmt_metric(display_value)}, patience counter = 0/{self.patience}")
             return
         
         # For minimization (default in Optuna)
@@ -145,15 +147,17 @@ class RelativeEarlyStoppingCallback:
             
             # Display values with correct sign for metrics
             if should_flip_sign:
-                # For maximization metrics (like accuracy), flip signs to positive
-                display_value = -current_value
-                display_prev = -prev_value
+                # For maximization metrics (like accuracy), display as positive values
+                display_value = abs(current_value) if current_value < 0 else current_value 
+                display_prev = abs(prev_value) if prev_value < 0 else prev_value
                 # For maximizing metrics, the comparison should be > not <
                 print(f"[Trial {current_trial_num}] New best: {fmt_metric(display_value)} > {fmt_metric(display_prev)}, "
                       f"patience counter reset = 0/{self.patience}")
             else:
-                # For minimization metrics (like MSE), keep original signs
-                print(f"[Trial {current_trial_num}] New best: {fmt_metric(current_value)} {compare_symbol} {fmt_metric(prev_value)}, "
+                # For minimization metrics (like MSE), ensure positive display values
+                display_value = abs(current_value) if self.metric in ['mse', 'rmse', 'mae'] else current_value
+                display_prev = abs(prev_value) if self.metric in ['mse', 'rmse', 'mae'] else prev_value
+                print(f"[Trial {current_trial_num}] New best: {fmt_metric(display_value)} {compare_symbol} {fmt_metric(display_prev)}, "
                       f"patience counter reset = 0/{self.patience}")
         else:
             self.stagnation_count += 1
@@ -161,27 +165,31 @@ class RelativeEarlyStoppingCallback:
             if study.best_trial.number == current_trial_num:
                 # This is a new best value but improvement isn't significant enough
                 if should_flip_sign:
-                    # For maximization metrics (like accuracy), flip signs
-                    display_value = -current_value
-                    display_best = -self.best_value
+                    # For maximization metrics (like accuracy), display as positive values
+                    display_value = abs(current_value) if current_value < 0 else current_value
+                    display_best = abs(self.best_value) if self.best_value < 0 else self.best_value
                     # For maximizing metrics, the comparison should always be >
                     print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(display_value)} > {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
                 else:
-                    # For minimization metrics (like MSE), keep original signs
-                    print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(current_value)} {compare_symbol} {fmt_metric(self.best_value)}, "
+                    # For minimization metrics (like MSE), ensure positive display values
+                    display_value = abs(current_value) if self.metric in ['mse', 'rmse', 'mae'] else current_value
+                    display_best = abs(self.best_value) if self.metric in ['mse', 'rmse', 'mae'] else self.best_value
+                    print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(display_value)} {compare_symbol} {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
             else:
                 # This trial is worse than the best so far
                 if should_flip_sign:
-                    # For maximization metrics (like accuracy), flip signs
-                    display_trial = -trial.value
-                    display_best = -self.best_value
+                    # For maximization metrics (like accuracy), display as positive values
+                    display_trial = abs(trial.value) if trial.value < 0 else trial.value
+                    display_best = abs(self.best_value) if self.best_value < 0 else self.best_value
                     print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(display_trial)}, Best = {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
                 else:
-                    # For minimization metrics (like MSE), keep original signs
-                    print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(trial.value)}, Best = {fmt_metric(self.best_value)}, "
+                    # For minimization metrics (like MSE), ensure positive display values
+                    display_trial = abs(trial.value) if self.metric in ['mse', 'rmse', 'mae'] else trial.value
+                    display_best = abs(self.best_value) if self.metric in ['mse', 'rmse', 'mae'] else self.best_value
+                    print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(display_trial)}, Best = {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
             
         # If we've exceeded patience, stop the optimization
