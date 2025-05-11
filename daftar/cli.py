@@ -414,13 +414,20 @@ def main(args: Optional[List[str]] = None) -> int:
     
     # Print example command for reproduction with ALL parameters used
     print("\nTo reproduce this run in the future, use:")
-    cmd = f"daftar --input {config.input_file} --target {config.target} "
+    cmd = f"daftar --input {config.input_file}"
+    
+    # Add ID column if specified
+    if hasattr(config, 'id_column') and config.id_column is not None:
+        cmd += f" --id {config.id_column}"
+    
+    # Add target column
+    cmd += f" --target {config.target}"
     
     # Only include --task if it was explicitly provided
     if getattr(parsed_args, 'task', None):
-        cmd += f"--task {config.problem_type} "
+        cmd += f" --task {config.problem_type}"
         
-    cmd += f"--model {config.model}"
+    cmd += f" --model {config.model}"
     
     # Add all non-default parameters that were explicitly provided
     if hasattr(config, 'outer_folds') and config.outer_folds is not None:
@@ -441,15 +448,14 @@ def main(args: Optional[List[str]] = None) -> int:
         cmd += f" --top_n {config.top_n}"
     if hasattr(config, 'seed') and config.seed != 42:
         cmd += f" --seed {config.seed}"
-    # Only include stratify if it differs from the default (true for classification, false for regression)
+    # Only include stratify if it was explicitly set to true for regression or false for classification
     if hasattr(config, 'use_stratified') and hasattr(config, 'problem_type'):
         is_classification = config.problem_type == 'classification'
         # Default is to stratify for classification only
         default_stratification = is_classification
         if config.use_stratified != default_stratification:
             cmd += f" --stratify {'true' if config.use_stratified else 'false'}"
-    if hasattr(config, 'id_column') and config.id_column is not None:
-        cmd += f" --id {config.id_column}"
+    
     # Always include the exact seed used in this run
     # Get the seed from parsed_args to ensure we use the exact value provided by the user
     if hasattr(parsed_args, 'seed'):
