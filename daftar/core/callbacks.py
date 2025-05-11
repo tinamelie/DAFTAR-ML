@@ -57,7 +57,7 @@ class RelativeEarlyStoppingCallback:
             # since they're already negated for optuna minimization
             if (self.metric in ['accuracy', 'f1', 'roc_auc'] or 
                 (self.problem_type == 'regression' and self.metric == 'r2')):
-                return -value
+                return -value  # Convert back to positive by negating
             return value
             
         display_current_value = to_display_value(current_value)
@@ -80,16 +80,18 @@ class RelativeEarlyStoppingCallback:
             self.best_value = current_value
             self.best_trial = study.best_trial.number
             
-            # Always display positive values for metrics that are naturally maximized
+            # Display with proper sign for metrics that are naturally maximized
             is_max_metric = (
                 (self.metric in ['accuracy', 'f1', 'roc_auc']) or
                 (self.problem_type == 'regression' and self.metric == 'r2')
             )
             
             if is_max_metric:
-                display_value = abs(current_value)  # Use absolute value for display
+                # For maximization metrics, flip the sign (since we internally negate them)
+                display_value = -current_value  # Convert back to positive by negating
                 print(f"[Trial {current_trial_num}] First trial: Score = {fmt_metric(display_value)}, patience counter = 0/{self.patience}")
             else:
+                # For minimization metrics, use the value as is
                 print(f"[Trial {current_trial_num}] First trial: Score = {fmt_metric(current_value)}, patience counter = 0/{self.patience}")
             return
         
@@ -112,8 +114,8 @@ class RelativeEarlyStoppingCallback:
             is_better = current_value > self.best_value
             compare_symbol = '>'            
             
-        # For maximizing metrics, we'll use absolute values for display
-        should_use_abs = (
+        # Check if this is a metric that should be displayed with flipped sign
+        should_flip_sign = (
             (self.metric in ['accuracy', 'f1', 'roc_auc']) or
             (self.problem_type == 'regression' and self.metric == 'r2')
         )
@@ -141,14 +143,16 @@ class RelativeEarlyStoppingCallback:
             self.best_trial = study.best_trial.number
             self.stagnation_count = 0
             
-            # Display values with correct sign for classification metrics
-            if should_use_abs:
-                display_value = abs(current_value)
-                display_prev = abs(prev_value)
+            # Display values with correct sign for metrics
+            if should_flip_sign:
+                # For maximization metrics (like accuracy), flip signs to positive
+                display_value = -current_value
+                display_prev = -prev_value
                 # For maximizing metrics, the comparison should be > not <
                 print(f"[Trial {current_trial_num}] New best: {fmt_metric(display_value)} > {fmt_metric(display_prev)}, "
                       f"patience counter reset = 0/{self.patience}")
             else:
+                # For minimization metrics (like MSE), keep original signs
                 print(f"[Trial {current_trial_num}] New best: {fmt_metric(current_value)} {compare_symbol} {fmt_metric(prev_value)}, "
                       f"patience counter reset = 0/{self.patience}")
         else:
@@ -156,23 +160,27 @@ class RelativeEarlyStoppingCallback:
             # Distinguish between identical values and actual worse values
             if study.best_trial.number == current_trial_num:
                 # This is a new best value but improvement isn't significant enough
-                if should_use_abs:
-                    display_value = abs(current_value)
-                    display_best = abs(self.best_value)
+                if should_flip_sign:
+                    # For maximization metrics (like accuracy), flip signs
+                    display_value = -current_value
+                    display_best = -self.best_value
                     # For maximizing metrics, the comparison should always be >
                     print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(display_value)} > {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
                 else:
+                    # For minimization metrics (like MSE), keep original signs
                     print(f"[Trial {current_trial_num}] Marginal improvement: {fmt_metric(current_value)} {compare_symbol} {fmt_metric(self.best_value)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
             else:
                 # This trial is worse than the best so far
-                if should_use_abs:
-                    display_trial = abs(trial.value)
-                    display_best = abs(self.best_value)  # Should be best_value not current_value
+                if should_flip_sign:
+                    # For maximization metrics (like accuracy), flip signs
+                    display_trial = -trial.value
+                    display_best = -self.best_value
                     print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(display_trial)}, Best = {fmt_metric(display_best)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
                 else:
+                    # For minimization metrics (like MSE), keep original signs
                     print(f"[Trial {current_trial_num}] No improvement: Current = {fmt_metric(trial.value)}, Best = {fmt_metric(self.best_value)}, "
                           f"patience counter = {self.stagnation_count}/{self.patience}")
             

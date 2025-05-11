@@ -1,0 +1,88 @@
+2025-05-11 12:05:39,082 - INFO - Logging to file: /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/DAFTAR-ML_20250511_120539.log
+2025-05-11 12:05:39,083 - INFO - Starting DAFTAR-ML pipeline
+2025-05-11 12:05:39,083 - INFO - Command: daftar --input /Users/Melie/Documents/Xylose_CAI_orthofinder_binary_preprocessed_MI500_classif.csv --target Xylose --id ID --inner 2 --outer 2 --repeats 1 --patience 2 --model xgb --metric roc_auc --force --stratify true
+2025-05-11 12:05:39,083 - INFO - Loading data from /Users/Melie/Documents/Xylose_CAI_orthofinder_binary_preprocessed_MI500_classif.csv
+2025-05-11 12:05:39,118 - INFO - Using StratifiedKFold for classification task
+2025-05-11 12:05:39,120 - INFO - Processing fold 1/2
+2025-05-11 12:05:39,122 - INFO - A new study created in memory with name: no-name-9b56ceea-cf4b-4725-911d-4f2a2c3bdbfc
+2025-05-11 12:05:39,528 - INFO - Trial 0 finished with value: -1.0 and parameters: {'n_estimators': 269, 'max_depth': 5, 'learning_rate': 0.22836777813850542, 'subsample': 0.8271733168824906, 'colsample_bytree': 0.5093095108857666, 'min_child_weight': 2}. Best is trial 0 with value: -1.0.
+[I 12:05:39] Trial 0 finished with value: 1.0 and parameters: {'n_estimators': 269, 'max_depth': 5, 'learning_rate': 0.22836777813850542, 'subsample': 0.8271733168824906, 'colsample_bytree': 0.5093095108857666, 'min_child_weight': 2}. Best is trial 0 with value: 1.0.
+[Trial 0] First trial: Score = 1.0000, patience counter = 0/2
+2025-05-11 12:05:40,479 - INFO - Trial 1 finished with value: -1.0 and parameters: {'n_estimators': 825, 'max_depth': 3, 'learning_rate': 0.11901959679995876, 'subsample': 0.5174655519634934, 'colsample_bytree': 0.9897843264000297, 'min_child_weight': 6}. Best is trial 0 with value: -1.0.
+[I 12:05:40] Trial 1 finished with value: 1.0 and parameters: {'n_estimators': 825, 'max_depth': 3, 'learning_rate': 0.11901959679995876, 'subsample': 0.5174655519634934, 'colsample_bytree': 0.9897843264000297, 'min_child_weight': 6}. Best is trial 0 with value: 1.0.
+[Trial 1] No improvement: Current = 1.0000, Best = 1.0000, patience counter = 1/2
+2025-05-11 12:05:40,986 - INFO - Trial 2 finished with value: -0.9961231078649306 and parameters: {'n_estimators': 281, 'max_depth': 7, 'learning_rate': 0.03961593547261666, 'subsample': 0.9826181348226058, 'colsample_bytree': 0.6391333521261647, 'min_child_weight': 10}. Best is trial 0 with value: -1.0.
+[I 12:05:40] Trial 2 finished with value: 0.9961231078649306 and parameters: {'n_estimators': 281, 'max_depth': 7, 'learning_rate': 0.03961593547261666, 'subsample': 0.9826181348226058, 'colsample_bytree': 0.6391333521261647, 'min_child_weight': 10}. Best is trial 0 with value: 1.0.
+[Trial 2] No improvement: Current = 0.996123, Best = 1.0000, patience counter = 2/2
+[Trial 2] Early stopping triggered: no significant improvement for 2 consecutive trials
+[Fold 1] Best model saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/best_model_fold_1.pkl
+[Fold 1] Predictions vs Actual CSV saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/predictions_vs_actual_fold_1.csv
+2025-05-11 12:05:41,717 - INFO - Using categorical units to plot a list of strings that are all parsable as floats or dates. If these strings should be plotted as numbers, cast to the appropriate data type before plotting.
+2025-05-11 12:05:41,719 - INFO - Using categorical units to plot a list of strings that are all parsable as floats or dates. If these strings should be plotted as numbers, cast to the appropriate data type before plotting.
+[Fold 1] Distribution histogram saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/fold_1_distribution.png
+[Fold 1] Samples list saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/fold_1_samples.csv
+2025-05-11 12:05:41,799 - INFO - Completed fold 1
+2025-05-11 12:05:41,836 - INFO - Processing fold 2/2
+2025-05-11 12:05:41,837 - INFO - A new study created in memory with name: no-name-a3e6171c-ed18-4a1c-be6e-bbad3734ecdc
+2025-05-11 12:05:42,320 - INFO - Trial 0 finished with value: -1.0 and parameters: {'n_estimators': 281, 'max_depth': 4, 'learning_rate': 0.20613757558813192, 'subsample': 0.506397317351686, 'colsample_bytree': 0.9370670645528071, 'min_child_weight': 2}. Best is trial 0 with value: -1.0.
+[I 12:05:42] Trial 0 finished with value: 1.0 and parameters: {'n_estimators': 281, 'max_depth': 4, 'learning_rate': 0.20613757558813192, 'subsample': 0.506397317351686, 'colsample_bytree': 0.9370670645528071, 'min_child_weight': 2}. Best is trial 0 with value: 1.0.
+[Trial 0] First trial: Score = 1.0000, patience counter = 0/2
+2025-05-11 12:05:43,398 - INFO - Trial 1 finished with value: -1.0 and parameters: {'n_estimators': 933, 'max_depth': 6, 'learning_rate': 0.09415982306382445, 'subsample': 0.9221911840612276, 'colsample_bytree': 0.62495758400242, 'min_child_weight': 7}. Best is trial 0 with value: -1.0.
+[I 12:05:43] Trial 1 finished with value: 1.0 and parameters: {'n_estimators': 933, 'max_depth': 6, 'learning_rate': 0.09415982306382445, 'subsample': 0.9221911840612276, 'colsample_bytree': 0.62495758400242, 'min_child_weight': 7}. Best is trial 0 with value: 1.0.
+[Trial 1] No improvement: Current = 1.0000, Best = 1.0000, patience counter = 1/2
+2025-05-11 12:05:43,856 - INFO - Trial 2 finished with value: -0.9989181536488941 and parameters: {'n_estimators': 164, 'max_depth': 10, 'learning_rate': 0.15726638560258352, 'subsample': 0.5696805363489289, 'colsample_bytree': 0.5410582537331472, 'min_child_weight': 8}. Best is trial 0 with value: -1.0.
+[I 12:05:43] Trial 2 finished with value: 0.9989181536488941 and parameters: {'n_estimators': 164, 'max_depth': 10, 'learning_rate': 0.15726638560258352, 'subsample': 0.5696805363489289, 'colsample_bytree': 0.5410582537331472, 'min_child_weight': 8}. Best is trial 0 with value: 1.0.
+[Trial 2] No improvement: Current = 0.998918, Best = 1.0000, patience counter = 2/2
+[Trial 2] Early stopping triggered: no significant improvement for 2 consecutive trials
+[Fold 2] Best model saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/best_model_fold_2.pkl
+[Fold 2] Predictions vs Actual CSV saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/predictions_vs_actual_fold_2.csv
+2025-05-11 12:05:44,444 - INFO - Using categorical units to plot a list of strings that are all parsable as floats or dates. If these strings should be plotted as numbers, cast to the appropriate data type before plotting.
+2025-05-11 12:05:44,445 - INFO - Using categorical units to plot a list of strings that are all parsable as floats or dates. If these strings should be plotted as numbers, cast to the appropriate data type before plotting.
+[Fold 2] Distribution histogram saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/fold_2_distribution.png
+[Fold 2] Samples list saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/fold_2_samples.csv
+2025-05-11 12:05:44,513 - INFO - Completed fold 2
+2025-05-11 12:05:44,555 - INFO - Saving results to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1
+2025-05-11 12:05:44,555 - INFO - Generating basic visualizations...
+2025-05-11 12:05:44,555 - INFO - Performing SHAP analysis (signed, focusing on positive/negative impact)...
+Starting Mean SHAP analysis with focus on positive and negative impact...
+Creating sample-level SHAP beeswarm plot...
+Creating fold-level SHAP beeswarm plot...
+Generating sample-level SHAP bar plot...
+Sample-level SHAP bar plot saved.
+Generating fold-level SHAP bar plot with cross-validation whiskers...
+Fold-level SHAP bar plot saved.
+Calculating SHAP‑target correlations...
+Saving SHAP analysis to CSV...
+2025-05-11 12:05:46,197 - INFO - Saving SHAP-based features summary...
+Important features summary saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/shap_features_summary.txt
+2025-05-11 12:05:46,200 - INFO - Saving feature importance values...
+[Fold 1] Feature importance values saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/feature_importance_fold_1.csv
+[Fold 2] Feature importance values saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/feature_importance_fold_2.csv
+Fold-level feature importance saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/feature_importance/feature_importance_values_fold.csv
+Warning: No sample-level importance values found for fold 1
+Warning: No sample-level importance values found for fold 2
+Creating differentiated sample-level importance using bootstrapping
+Sample-level feature importance saved to /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/feature_importance/feature_importance_values_sample.csv
+2025-05-11 12:05:46,699 - INFO - Creating fold-level feature importance bar plot...
+Generating Fold-Level feature importance bar plot (top 25 features)...
+Fold-Level feature importance bar plot saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/feature_importance/feature_importance_bar_fold.png
+2025-05-11 12:05:46,907 - INFO - Creating sample-level feature importance bar plot...
+Generating Sample-Level feature importance bar plot (top 25 features)...
+Sample-Level feature importance bar plot saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/feature_importance/feature_importance_bar_sample.png
+2025-05-11 12:05:47,062 - INFO - Generating predictions and confusion matrices...
+[Fold 1] Predictions vs Actual CSV saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/predictions_vs_actual_fold_1.csv
+Confusion matrix saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_1/confusion_matrix_fold_1.png
+[Fold 2] Predictions vs Actual CSV saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/predictions_vs_actual_fold_2.csv
+Confusion matrix saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/fold_2/confusion_matrix_fold_2.png
+Confusion matrix saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/confusion_matrix_global.png
+Global confusion matrix saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/confusion_matrix_global.png
+Overall predictions vs actual CSV saved at /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1/predictions_vs_actual_overall.csv
+2025-05-11 12:05:47,702 - INFO - Analysis complete.
+2025-05-11 12:05:47,703 - INFO - Pipeline completed successfully
+DAFTAR-ML analysis completed successfully.
+Results saved to: /Users/Melie/Documents/DAFTAR-ML/DAFTAR-ML_Xylose_xgboost_classification_cv2x2x1
+
+================================================================================
+
+To reproduce this run in the future, use:
+daftar --input /Users/Melie/Documents/Xylose_CAI_orthofinder_binary_preprocessed_MI500_classif.csv --target Xylose --model xgb --outer 2 --inner 2 --repeats 1 --metric roc_auc --patience 2 --threshold 0.001 --id ID --seed 42

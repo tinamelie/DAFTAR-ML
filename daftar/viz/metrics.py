@@ -14,6 +14,14 @@ from sklearn.metrics import (
     confusion_matrix, roc_curve, precision_recall_curve, 
     auc, PrecisionRecallDisplay, RocCurveDisplay
 )
+from scipy import stats
+
+from daftar.viz.color_definitions import (
+    CONFUSION_MATRIX_CMAP,
+    REGRESSION_MEAN_LINE_COLOR,
+    DENSITY_ACTUAL_COLOR,
+    DENSITY_PREDICTED_COLOR
+)
 
 
 def plot_regression_metrics(
@@ -87,7 +95,7 @@ def plot_regression_residuals(
     
     # Create residual plot
     plt.scatter(y_pred, residuals, alpha=0.5)
-    plt.axhline(y=0, color='r', linestyle='--', label='Zero residual')
+    plt.axhline(y=0, color=REGRESSION_MEAN_LINE_COLOR, linestyle='--', label='Zero residual')
     
     # Add smoothed trend line
     try:
@@ -181,7 +189,7 @@ def plot_confusion_matrix(
     
     # Plot confusion matrix
     sns.heatmap(
-        cm, annot=True, fmt=fmt, cmap='Blues',
+        cm, annot=True, fmt=fmt, cmap=CONFUSION_MATRIX_CMAP,
         xticklabels=class_names, yticklabels=class_names
     )
     

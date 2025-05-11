@@ -49,8 +49,11 @@ class Config:
         cores: Number of CPU cores to use
         seed: Random seed
         top_n: Number of top features to include in visualizations
+        verbose: Whether to enable verbose console output
         force_overwrite: Whether to overwrite existing output directory without asking
         original_command: The original command that was used to run the pipeline
+        use_stratified: Whether to use stratified splitting for classification (default: True)
+        confusion_cmap: Colormap to use for confusion matrices (default: 'Blues')
     """
     # Required parameters
     input_file: str
@@ -80,7 +83,14 @@ class Config:
     cores: int = -1  # -1 means use all cores
     seed: int = 42
     top_n: int = DEFAULT_TOP_N
+    verbose: bool = False
     force_overwrite: bool = False
+    
+    # Visualization parameters
+    confusion_cmap: Optional[str] = None
+    
+    # New parameter
+    use_stratified: bool = True
     
     def __post_init__(self):
         """Validate and set derived attributes after initialization."""
@@ -193,5 +203,7 @@ class Config:
             "cores": self.cores,
             "seed": self.seed,
             "top_n": self.top_n,
-            "force_overwrite": self.force_overwrite
+            "force_overwrite": self.force_overwrite,
+            "use_stratified": self.use_stratified,
+            "confusion_cmap": self.confusion_cmap
         }

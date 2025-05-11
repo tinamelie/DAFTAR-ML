@@ -1,0 +1,45 @@
+Hyperparameter Tuning Summary for Fold 1
+============================================================
+
+Total Trials: 3
+Best Trial: 0
+Best Value: -1.00000000
+
+Early Stopping Pattern:
+------------------------------------------------------------
+Trial   0: Value = -1.00000000 | Patience =  0 | Improvement: ✓
+  Hyperparameters:
+    n_estimators: 269
+    max_depth: 5
+    learning_rate: 0.22836777813850542
+    subsample: 0.8271733168824906
+    colsample_bytree: 0.5093095108857666
+    min_child_weight: 2
+
+Trial   1: Value = -1.00000000 | Patience =  1 | Improvement: ×
+  Hyperparameters:
+    n_estimators: 825
+    max_depth: 3
+    learning_rate: 0.11901959679995876
+    subsample: 0.5174655519634934
+    colsample_bytree: 0.9897843264000297
+    min_child_weight: 6
+
+Trial   2: Value = -0.99612311 | Patience =  2 | Improvement: ×
+  Hyperparameters:
+    n_estimators: 281
+    max_depth: 7
+    learning_rate: 0.03961593547261666
+    subsample: 0.9826181348226058
+    colsample_bytree: 0.6391333521261647
+    min_child_weight: 10
+
+
+Best Hyperparameters:
+------------------------------------------------------------
+n_estimators: 269
+max_depth: 5
+learning_rate: 0.22836777813850542
+subsample: 0.8271733168824906
+colsample_bytree: 0.5093095108857666
+min_child_weight: 2

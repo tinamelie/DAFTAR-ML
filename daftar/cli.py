@@ -15,6 +15,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from daftar.core.config import Config
 from daftar.core.pipeline import Pipeline
 from daftar.utils.warnings import suppress_xgboost_warnings
+import daftar  # For version information
 
 # Suppress XGBoost warnings globally
 suppress_xgboost_warnings()
@@ -109,6 +110,20 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         help="Number of outer CV folds"
     )
     
+    cv_args.add_argument(
+        "--repeats",
+        type=int,
+        default=3,
+        help="Number of CV repetitions"
+    )
+    
+    cv_args.add_argument(
+        "--stratify",
+        type=str,
+        choices=["true", "false"],
+        help="Whether to use stratified splitting for classification tasks (default: true for classification, false for regression)"
+    )
+    
     optional_args.add_argument(
         "--config",
         type=str,
@@ -128,14 +143,6 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         help="Metric to optimize (regression: mse/rmse/mae/r2, classification: accuracy/f1/roc_auc)"
     )
         
-
-    cv_args.add_argument(
-        "--repeats",
-        type=int,
-        default=3,
-        help="Number of CV repetitions"
-    )
-    
     # Optimization arguments
     opt_args = parser.add_argument_group('Optimization arguments')
     
@@ -163,12 +170,22 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         help="Number of top features to include in visualizations"
     )
     
-
+    viz_args.add_argument(
+        "--confusion_cmap",
+        type=str,
+        help="Colormap for confusion matrices (e.g., 'Blues', 'Reds', 'viridis', 'plasma'). Default: 'Blues'"
+    )
     
     out_args.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing output directory without asking"
+    )
+    
+    out_args.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output showing all details in the console"
     )
     
     # Execution arguments
@@ -190,6 +207,11 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     
     # Parse arguments
     parsed_args, remaining = parser.parse_known_args(args)
+    
+    # Check for unknown arguments and throw an error if any are found
+    if remaining:
+        unknown_args = " ".join(remaining)
+        parser.error(f"Unrecognized arguments: {unknown_args}")
         
     return parsed_args, remaining
 
@@ -211,6 +233,9 @@ def main(args: Optional[List[str]] = None) -> int:
 ██████╔╝██║  ██║██║        ██║   ██║  ██║██║  ██║      ██║ ╚═╝ ██║███████╗
 ╚═════╝ ╚═╝  ╚═╝╚═╝        ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝╚══════╝""")
     print("")  
+    # Print the version below the banner
+    print(f"Version {daftar.__version__}")
+    print("")
     # Capture the original command
     if args is None:
         import shlex
@@ -293,9 +318,22 @@ def main(args: Optional[List[str]] = None) -> int:
                         print(f"Auto-detected CLASSIFICATION task (binary)")
                     else:
                         print(f"Auto-detected CLASSIFICATION task (multiclass)")
-                    
                 
                 config_dict['problem_type'] = task_type
+                
+                # Set default metric based on task type if not specified
+                if 'metric' not in config_dict and getattr(parsed_args, 'metric', None) is None:
+                    if task_type == 'regression':
+                        default_metric = 'mse'
+                        print(f"Using default optimization metric: {default_metric}")
+                    else:  # classification
+                        default_metric = 'accuracy'
+                        print(f"Using default optimization metric: {default_metric}")
+                    config_dict['metric'] = default_metric
+                elif getattr(parsed_args, 'metric', None):
+                    print(f"Using optimization metric: {parsed_args.metric}")
+                elif 'metric' in config_dict:
+                    print(f"Using optimization metric: {config_dict['metric']}")
                 
             except pd.errors.EmptyDataError:
                 print(f"ERROR: The input file is empty: {input_file}")
@@ -318,6 +356,10 @@ def main(args: Optional[List[str]] = None) -> int:
                 config_dict['relative_threshold'] = value
             elif arg == 'force':
                 config_dict['force_overwrite'] = value
+            elif arg == 'verbose':
+                config_dict['verbose'] = value
+            elif arg == 'stratify':
+                config_dict['use_stratified'] = value == 'true'
             else:
                 config_dict[arg] = value
     
@@ -367,6 +409,9 @@ def main(args: Optional[List[str]] = None) -> int:
     print(f"DAFTAR-ML analysis completed successfully.")
     print(f"Results saved to: {output_dir}")
     
+    # Print separator before reproduction command
+    print("\n" + "=" * 80)
+    
     # Print example command for reproduction with ALL parameters used
     print("\nTo reproduce this run in the future, use:")
     cmd = f"daftar --input {config.input_file} --target {config.target} "
@@ -392,6 +437,17 @@ def main(args: Optional[List[str]] = None) -> int:
         cmd += f" --patience {config.patience}"
     if hasattr(config, 'relative_threshold') and config.relative_threshold != 1e-6:
         cmd += f" --threshold {config.relative_threshold}"
+    if hasattr(config, 'top_n') and config.top_n != 25:
+        cmd += f" --top_n {config.top_n}"
+    if hasattr(config, 'seed') and config.seed != 42:
+        cmd += f" --seed {config.seed}"
+    # Only include stratify if it differs from the default (true for classification, false for regression)
+    if hasattr(config, 'use_stratified') and hasattr(config, 'problem_type'):
+        is_classification = config.problem_type == 'classification'
+        # Default is to stratify for classification only
+        default_stratification = is_classification
+        if config.use_stratified != default_stratification:
+            cmd += f" --stratify {'true' if config.use_stratified else 'false'}"
     if hasattr(config, 'id_column') and config.id_column is not None:
         cmd += f" --id {config.id_column}"
     # Always include the exact seed used in this run
