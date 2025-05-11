@@ -584,6 +584,7 @@ def get_args() -> argparse.Namespace:
         description="Visualise target values across nested CV splits.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         allow_abbrev=False,
+        usage="daftar-cv [-h] --input PATH --target COLUMN --id COLUMN [--outer INTEGER] [--inner INTEGER] [--repeats INTEGER] [--seed INTEGER] [--stratify {true,false}] [--task_type {classification,regression}] [--output_dir PATH] [--force] [--granular] [--alpha FLOAT]"
     )
 
     req = p.add_argument_group("Required")
@@ -592,14 +593,14 @@ def get_args() -> argparse.Namespace:
     out = p.add_argument_group("Output")
     viz = p.add_argument_group("Visualization")
 
-    req.add_argument("--input", required=True, help="Path to CSV data file")
-    req.add_argument("--target", required=True, help="Target column name")
-    req.add_argument("--id", required=True, help="ID column name")
+    req.add_argument("--input", required=True, metavar="PATH", help="Path to CSV data file")
+    req.add_argument("--target", required=True, metavar="COLUMN", help="Target column name")
+    req.add_argument("--id", required=True, metavar="COLUMN", help="ID column name")
 
-    cv.add_argument("--outer", type=int, default=5, help="Outer folds (default=5)")
-    cv.add_argument("--inner", type=int, default=3, help="Inner folds (default=3)")
-    cv.add_argument("--repeats", type=int, default=3, help="Repeats (default=3)")
-    cv.add_argument("--seed", type=int, help="Random seed for reproducibility")
+    cv.add_argument("--outer", type=int, default=5, metavar="INTEGER", help="Outer folds (default=5)")
+    cv.add_argument("--inner", type=int, default=3, metavar="INTEGER", help="Inner folds (default=3)")
+    cv.add_argument("--repeats", type=int, default=3, metavar="INTEGER", help="Repeats (default=3)")
+    cv.add_argument("--seed", type=int, metavar="INTEGER", help="Random seed for reproducibility")
     cv.add_argument("--stratify", type=str, choices=["true", "false"], 
                   help="Whether to use stratified splitting for classification tasks (default: true for classification, false for regression)")
     
@@ -611,6 +612,7 @@ def get_args() -> argparse.Namespace:
 
     out.add_argument(
         "--output_dir",
+        metavar="PATH",
         help="Directory for all outputs (defaults to current directory)"
     )
     out.add_argument(
@@ -628,6 +630,7 @@ def get_args() -> argparse.Namespace:
         "--alpha",
         type=float,
         default=0.05,
+        metavar="FLOAT",
         help="Statistical significance threshold for fold balance tests (default=0.05)"
     )
 

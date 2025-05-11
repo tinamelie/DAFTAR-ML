@@ -17,17 +17,21 @@ from tqdm import tqdm
 
 def main():
     """Preprocess a dataset for DAFTAR-ML with progress bar."""
-    parser = argparse.ArgumentParser(description="Preprocess a dataset for DAFTAR-ML", allow_abbrev=False)
+    parser = argparse.ArgumentParser(
+        description="Preprocess a dataset for DAFTAR-ML", 
+        allow_abbrev=False,
+        usage="usage: daftar-preprocess [-h] --input PATH --target COLUMN --id COLUMN [--output_dir PATH] [--force] [--no_report] [--quiet] [--task {regression,classification}] [--k INTEGER] [--trans_feat {log1p,standard,minmax}] [--trans_target {log1p,standard,minmax}] [--jobs INTEGER] [--keep_na] [--keep_constant] [--no_rename] [--keep_zero_mi]"
+    )
     
     # Required parameters
     required_args = parser.add_argument_group('Required parameters')
-    required_args.add_argument("--input", required=True, help="Path to input CSV file containing features and target")
-    required_args.add_argument("--target", required=True, help="Name of the target column to predict")
-    required_args.add_argument("--id", required=True, help="Name of the ID column (e.g., species identifiers, sample names)")
+    required_args.add_argument("--input", required=True, metavar="PATH", help="Path to input CSV file containing features and target")
+    required_args.add_argument("--target", required=True, metavar="COLUMN", help="Name of the target column to predict")
+    required_args.add_argument("--id", required=True, metavar="COLUMN", help="Name of the ID column (e.g., species identifiers, sample names)")
     
     # Output configuration
     output_args = parser.add_argument_group('Output configuration')
-    output_args.add_argument("--output_dir", help="Directory where output files will be saved. If not specified, files will be saved in the input file's directory")
+    output_args.add_argument("--output_dir", metavar="PATH", help="Directory where output files will be saved. If not specified, files will be saved in the input file's directory")
     output_args.add_argument("--force", action="store_true", help="Force overwrite if output file already exists")
     output_args.add_argument("--no_report", action="store_true", help="Skip generating the detailed text report and feature importance CSV file")
     output_args.add_argument("--quiet", action="store_true", help="Suppress detailed console output during processing")
@@ -36,7 +40,7 @@ def main():
     analysis_args = parser.add_argument_group('Analysis configuration')
     analysis_args.add_argument("--task", choices=["regression", "classification"], 
                         help="Problem type: 'regression' for continuous targets, 'classification' for binary targets (optional - will be auto-detected if not specified)")
-    analysis_args.add_argument("--k", type=int, default=500, 
+    analysis_args.add_argument("--k", type=int, default=500, metavar="INTEGER",
                         help="Number of top features to select based on mutual information scores (default: 500)")
     
     # Transformation options
@@ -48,7 +52,7 @@ def main():
     
     # Processing options
     process_args = parser.add_argument_group('Processing options')
-    process_args.add_argument("--jobs", type=int, default=-1, 
+    process_args.add_argument("--jobs", type=int, default=-1, metavar="INTEGER",
                         help="Number of parallel jobs for feature selection. -1 uses all CPU cores (default: -1)")
     process_args.add_argument("--keep_na", action="store_true", 
                         help="Keep rows with missing values. By default, rows with NaN are removed")
@@ -64,16 +68,15 @@ def main():
 EXAMPLES:
 
   Default usage (auto-detects task type):
-    python preprocess.py --input data.csv --target TARGET --id ID --output_dir OUTPUT_DIRECTORY
+    python preprocess.py --input PATH --target COLUMN --id COLUMN --output_dir PATH
 
   Select top 200 features with log transformation:
-    python preprocess.py --input data.csv --target TARGET --id ID --k 200 --trans_feat log1p --output_dir OUTPUT_DIRECTORY
+    python preprocess.py --input PATH --target COLUMN --id COLUMN --k 200 --trans_feat log1p --output_dir PATH
 """
     # Set formatter to preserve formatting
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     
     # Update the usage message
-    parser.usage = parser.format_usage().replace("usage: ", "Usage: ")
     parser._optionals.title = "Other optional arguments"
     parser._actions[0].help = "Show this help message and exit"
     

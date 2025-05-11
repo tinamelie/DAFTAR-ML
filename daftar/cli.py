@@ -21,6 +21,15 @@ import daftar  # For version information
 suppress_xgboost_warnings()
 
 
+# Custom formatter that doesn't show defaults for required arguments
+class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    def _get_help_string(self, action):
+        # Don't add default text for required arguments
+        if action.required:
+            return action.help
+        return super()._get_help_string(action)
+
+
 def load_config_from_yaml(filepath: str) -> Dict[str, Any]:
     """Load configuration from a YAML file.
     
@@ -44,7 +53,8 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         Tuple of (parsed_args, remaining_args)
     """
     parser = argparse.ArgumentParser(description="DAFTAR-ML: Feature Importance via Repeated Annotation of Trees", 
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=CustomHelpFormatter,
+        usage="daftar --input preprocessed.csv --target COLUMN --id COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task {regression,classification}] [--metric NAME] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
     )
     
     # Customize help message to capitalize 'Show'
@@ -57,13 +67,15 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--input",
         type=str,
         required=True,
-        help="Path to input CSV file"
+        metavar="PATH",
+        help="Path to preprocessed .csv file"
     )
     
     required_args.add_argument(
         "--target",
         type=str,
         required=True,
+        metavar="COLUMN",
         help="Name of target column to predict"
     )
     
@@ -71,7 +83,8 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--id",
         type=str,
         required=True,
-        help="Column with sample IDs (required)"
+        metavar="COLUMN",
+        help="Column with sample IDs"
     )
     
     required_args.add_argument(
@@ -90,6 +103,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     out_args.add_argument(
         "--output_dir",
         type=str,
+        metavar="PATH",
         help="Directory where output files will be saved"
     )
     
@@ -100,6 +114,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--inner",
         type=int,
         default=3,
+        metavar="INTEGER",
         help="Number of inner CV folds"
     )
     
@@ -107,6 +122,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--outer",
         type=int,
         default=5,
+        metavar="INTEGER",
         help="Number of outer CV folds"
     )
     
@@ -114,10 +130,11 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--repeats",
         type=int,
         default=3,
+        metavar="INTEGER",
         help="Number of CV repetitions"
     )
     
-    cv_args.add_argument(
+    optional_args.add_argument(
         "--stratify",
         type=str,
         choices=["true", "false"],
@@ -127,6 +144,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     optional_args.add_argument(
         "--config",
         type=str,
+        metavar="PATH",
         help="Path to YAML configuration file"
     )
     
@@ -140,6 +158,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     optional_args.add_argument(
         "--metric",
         type=str,
+        metavar="NAME",
         help="Metric to optimize (regression: mse/rmse/mae/r2, classification: accuracy/f1/roc_auc)"
     )
         
@@ -150,14 +169,16 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--patience",
         type=int,
         default=50,
-        help="Number of trials to wait without improvement before early stopping (defaults to 50 for thorough optimization)"
+        metavar="INTEGER",
+        help="Number of trials to wait without improvement before early stopping"
     )
     
     opt_args.add_argument(
         "--threshold",
         type=float,
         default=1e-6,
-        help="Minimum improvement threshold for early stopping (defaults vary by metric: 1e-6 for MSE, 1e-4 for RMSE/MAE, 1e-3 for R² and classification metrics)"
+        metavar="FLOAT",
+        help="Minimum improvement threshold for early stopping"
     )
     
     # Visualization arguments
@@ -167,13 +188,8 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--top_n",
         type=int,
         default=25,
+        metavar="INTEGER",
         help="Number of top features to include in visualizations"
-    )
-    
-    viz_args.add_argument(
-        "--confusion_cmap",
-        type=str,
-        help="Colormap for confusion matrices (e.g., 'Blues', 'Reds', 'viridis', 'plasma'). Default: 'Blues'"
     )
     
     out_args.add_argument(
@@ -195,6 +211,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--cores",
         type=int,
         default=-1,
+        metavar="INTEGER",
         help="Number of CPU cores to use (-1 for all available)"
     )
     
@@ -202,6 +219,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         "--seed",
         type=int,
         default=42,
+        metavar="INTEGER",
         help="Random seed"
     )
     

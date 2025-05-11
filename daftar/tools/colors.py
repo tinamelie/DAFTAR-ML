@@ -260,13 +260,15 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(
         description="DAFTAR-ML color test visualization tool",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage="daftar-colors [-h] [--output_dir PATH] [--path]"
     )
     
     parser.add_argument(
         "--output_dir",
         type=str,
         default=".",
+        metavar="PATH",
         help="Output directory (default: current directory)"
     )
     
