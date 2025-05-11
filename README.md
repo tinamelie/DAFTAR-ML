@@ -53,24 +53,24 @@ A typical DAFTAR-ML workflow consists of three steps:
 
 ### 1. Preprocess raw data (optional)
 ```bash
-daftar-preprocess --input data.csv --target target_column --id id_column
+daftar-preprocess --input PATH --target COLUMN --id COLUMN
 ```
 
 ### 2. Visualize CV splits (optional)
 ```bash
-daftar-cv --input preprocessed_data.csv --target target_column --id id_column
+daftar-cv --input PATH --target COLUMN --id COLUMN
 ```
 
 ### 3. Run the main pipeline
 ```
-daftar --input preprocessed_data.csv --target target_column --id id_column --model [xgb|rf]
+daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf}
 ```
 ## Input Data
 
 DAFTAR-ML expects a comma-separated (.csv) matrix with the following columns:
 
-- **ID**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--id`.
-- **Target**: Response variable to predict (e.g., growth rate, yield, etc.). May be continuous (regression) or categorical (binary or multiclass classification). Specify with `--target`.     
+- **ID**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--id COLUMN`.
+- **Target**: Response variable to predict (e.g., growth rate, yield, etc.). May be continuous (regression) or categorical (binary or multiclass classification). Specify with `--target COLUMN`.     
 - **Features**: Predictor columns (e.g., orthologous gene counts, CAI values, expression profiles).
 
 
@@ -82,60 +82,13 @@ Examples provided in [`test_data/`](test_data):
 
 * `Test_data_binary.csv` – binary classification example (0/1 targets)
 * `Test_data_continuous.csv` – regression example with continuous targets
-## Model Selection Guide
-
-DAFTAR-ML supports both XGBoost and Random Forest algorithms. Choose based on your dataset characteristics:
-
-#### XGBoost (`--model xgb`): 
-  - Higher performance for complex data with sufficient samples (>100)
-  - Better with high-dimensional data and non-linear relationships
-  - May overfit on very small datasets
-
-#### Random Forest (`--model rf`):
-  - More robust for small datasets (<100 samples)
-  - Less prone to overfitting
-  - May not capture complex non-linear relationships as effectively
-
-## Setup
-
-1. First, clone this repository and navigate to the DAFTAR-ML directory:
-   ```bash
-   git clone https://github.com/tinamelie/DAFTAR-ML.git
-   cd DAFTAR-ML
-   ```
-
-2. Install DAFTAR-ML (and all dependencies) in editable mode:
-   ```bash
-   pip install -e .
-   ```
-   
-   This command will automatically install all required dependencies listed above--the package's setup.py includes them as requirements.
-
-
-## Dependencies
-
-- pandas>=1.3.0
-- numpy>=1.20.0
-- scikit-learn>=1.0.0
-- xgboost>=1.5.0
-- shap>=0.40.0
-- optuna>=2.10.0
-- matplotlib>=3.4.0
-- seaborn>=0.11.0
-- pyyaml>=6.0
-- joblib>=1.1.0
-- tqdm>=4.64.0
-- plotly>=5.24.1
-
-
-## Detailed Usage Guide
 
 ### 1. Data Preprocessing
 
 Before running DAFTAR-ML, prepare your data using the preprocessing script to filter your data. This step is optional but recommended for better performance and more accurate results:
 
 ```bash
-daftar-preprocess --input data.csv --target target_column --id id_column --output_dir PATH
+daftar-preprocess --input PATH --target COLUMN --id COLUMN --output_dir PATH
 ```
 The preprocessing module uses mutual information to select features with the strongest relationship to the target variable, without assuming linearity. It selects the top-k features with highest MI scores, reducing dimensionality while preserving predictive power. Results include a summary report of transformations and selected features. Produces the following files:
 
@@ -150,8 +103,8 @@ The preprocessing module uses mutual information to select features with the str
 
 #### Required Parameters:
 * `--input PATH`: Path to input CSV file
-* `--target target_column`: Target column name to predict
-* `--id id_column`: Name of the ID column (e.g., species identifiers, sample names)
+* `--target COLUMN`: Target column name to predict
+* `--id COLUMN`: Name of the ID column (e.g., species identifiers, sample names)
 
 #### Optional Parameters:
 
@@ -195,15 +148,15 @@ Note: This does not produce any modified or processed data from your input. This
 ##### CV Calculator Usage
 
 ```bash
-daftar-cv --input preprocessed_data.csv --target target_column --id id_column --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir PATH
+daftar-cv --input PATH --target COLUMN --id COLUMN --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir PATH
 ```
 
 #### CV Calculator Parameters
 
 #### Required Parameters:
 * `--input PATH`: Path to the preprocessed CSV file containing your feature data
-* `--target TARGET`: Name of the target column to predict
-* `--id ID`: Name of the ID column (e.g., species identifiers, sample names)
+* `--target COLUMN`: Name of the target column to predict
+* `--id COLUMN`: Name of the ID column (e.g., species identifiers, sample names)
 
 #### Optional Parameters:
 
@@ -263,7 +216,7 @@ Note: Larger p-values are better for fold quality.
 After preprocessing your data and planning your cross-validation strategy, run the main DAFTAR-ML pipeline to train models, analyze feature importance, and generate visualizations:
 
 ```bash
-daftar --input preprocessed_data.csv --target target_column --id id_column --model [xgb|rf] --output_dir PATH
+daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PATH
 ```
 #### DAFTAR-ML Pipeline
 
@@ -278,15 +231,15 @@ daftar --input preprocessed_data.csv --target target_column --id id_column --mod
 
 #### Required Parameters:
 * `--input PATH`: Path to the preprocessed CSV file containing features and target variable
-* `--target target_column`: Name of the target column to predict in the input file
-* `--id id_column`: Name of the ID column (e.g., species identifiers, sample names)
+* `--target COLUMN`: Name of the target column to predict in the input file
+* `--id COLUMN`: Name of the ID column (e.g., species identifiers, sample names)
 * `--model {xgb,rf}`: Machine learning algorithm to use (xgb=XGBoost, rf=Random Forest)
 
 #### Optional Parameters:
 
 ##### Analysis Configuration:
 * `--task {regression,classification}`: Problem type (regression or classification). Auto-detected if not specified
-* `--metric STRING`: Performance metric to optimize. For regression: 'mse', 'rmse', 'mae', 'r2'; for classification: 'accuracy', 'f1', 'roc_auc' (default: 'mse' for regression, 'accuracy' for classification)
+* `--metric NAME`: Performance metric to optimize. For regression: 'mse', 'rmse', 'mae', 'r2'; for classification: 'accuracy', 'f1', 'roc_auc' (default: 'mse' for regression, 'accuracy' for classification)
 
 ##### Cross-validation Configuration:
 * `--outer INTEGER`: Number of partitions for the outer CV loop, which evaluates model performance (default: 5)
@@ -410,8 +363,9 @@ These thresholds determine when to stop hyperparameter optimization. You can cus
 Instead of passing a long list of CLI flags you can store them in a YAML file:
 
 ```yaml
-input: preprocessed_data.csv
-target: GrowthRate
+input: PATH
+id: COLUMN
+target: COLUMN
 model: xgb
 outer: 5
 inner: 5
@@ -435,7 +389,7 @@ Anything specified on the CLI will override YAML values.
 DAFTAR-ML includes a utility to display all the color palettes used in its visualizations. Running the colors tool will show you the current color configuration and example plots. 
 
 ```bash
-daftar-colors --output_dir output_directory
+daftar-colors --output_dir PATH
 ```
 
 Colors are managed in `daftar/viz/color_definitions.py` - make any changes to the palette here. 
