@@ -401,21 +401,21 @@ EXAMPLES:
                 f.write(f"### Option 1: Visualize CV splits and optimize them for data structure\n")
                 f.write(f"**Default CV splits:**\n")
                 # Basic CV calculator command
-                cv_cmd1 = f"python cv_calculator.py --input {output_path} --id {args.id} --target {args.target}"
+                cv_cmd1 = f"python cv_calculator.py --input {output_path} --id {id_column} --target {args.target}"
                 if args.output_dir:
                     cv_cmd1 += f" --output_dir {args.output_dir}"
                 f.write(f"{cv_cmd1}\n\n")
                 
                 f.write(f"**Custom CV parameters:**\n")
                 # Custom CV parameters
-                cv_cmd2 = f"python cv_calculator.py --input {output_path} --id {args.id} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER"
+                cv_cmd2 = f"python cv_calculator.py --input {output_path} --id {id_column} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER"
                 if args.output_dir:
                     cv_cmd2 += f" --output_dir {args.output_dir}"
                 f.write(f"{cv_cmd2}\n\n")
                 
                 f.write(f"### Option 2: Run the full DAFTAR-ML pipeline\n")
                 # Run DAFTAR-ML command
-                run_cmd = f"python run_daftar.py --input {output_path} --target {args.target} --id {args.id} --model [xgb|rf]"
+                run_cmd = f"python run_daftar.py --input {output_path} --target {args.target} --id {id_column} --model [xgb|rf]"
                 if args.output_dir:
                     run_cmd += f" --output_dir {args.output_dir}"
                 f.write(f"{run_cmd}\n")
@@ -431,14 +431,14 @@ EXAMPLES:
         print("===========================================================")
         print("Option 1: Visualize CV splits and optimize them for data structure")
         print(f"  Default CV splits : ")
-        print(f"  daftar-cv --input {output_path} --id {args.id} --target {args.target}{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
+        print(f"  daftar-cv --input {output_path} --id {id_column} --target {args.target}{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print()
         print(f"  Custom CV parameters:")
-        print(f"  daftar-cv --input {output_path} --id {args.id} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
+        print(f"  daftar-cv --input {output_path} --id {id_column} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print()
         print("Option 2: Run the DAFTAR-ML pipeline with default settings")
-        print(f"  daftar --input {output_path} --target {args.target} --id {args.id} --model [xgb|rf]{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
-        print("===========================================================\n")
+        print(f"  daftar --input {output_path} --target {args.target} --id {id_column} --model [xgb|rf]{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
+
         
         return 0
     except Exception as e:
