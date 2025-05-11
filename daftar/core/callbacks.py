@@ -64,21 +64,17 @@ class RelativeEarlyStoppingCallback:
         display_trial_value = to_display_value(trial.value)
         
         # Helper to format metric values based on magnitude for readability
-        def fmt_metric(val: float) -> str:
-            # For display purposes, metrics should always be positive
-            abs_val = abs(val)
-            if abs_val >= 1000:
-                return f"{abs_val:.0f}" if val < 0 else f"{val:.0f}"
-            elif abs_val >= 100:
-                return f"{abs_val:.1f}" if val < 0 else f"{val:.1f}"
-            elif abs_val >= 1:
-                return f"{abs_val:.4f}" if val < 0 else f"{val:.4f}"
-            elif abs_val >= 0.1:
-                return f"{abs_val:.6f}" if val < 0 else f"{val:.6f}"
-            elif abs_val >= 0.01:
-                return f"{abs_val:.8f}" if val < 0 else f"{val:.8f}"
+        def fmt_metric(value: float) -> str:
+            """Format metric value for display with appropriate precision."""
+            if abs(value) >= 0.1:
+                return f"{value:.6f}"
+            elif abs(value) >= 0.01:
+                return f"{value:.8f}"
+            elif abs(value) >= 0.001:
+                return f"{value:.10f}"
             else:
-                return f"{abs_val:.10f}" if val < 0 else f"{val:.10f}"
+                # For extremely small values, use scientific notation
+                return f"{value:.2e}"
         
         # First trial
         if self.best_value is None:
