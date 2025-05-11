@@ -73,8 +73,12 @@ class RelativeEarlyStoppingCallback:
                 return f"{abs_val:.1f}" if val < 0 else f"{val:.1f}"
             elif abs_val >= 1:
                 return f"{abs_val:.4f}" if val < 0 else f"{val:.4f}"
-            else:
+            elif abs_val >= 0.1:
                 return f"{abs_val:.6f}" if val < 0 else f"{val:.6f}"
+            elif abs_val >= 0.01:
+                return f"{abs_val:.8f}" if val < 0 else f"{val:.8f}"
+            else:
+                return f"{abs_val:.10f}" if val < 0 else f"{val:.10f}"
         
         # First trial
         if self.best_value is None:
