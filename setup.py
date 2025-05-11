@@ -29,7 +29,7 @@ description = (
 
 setup(
     name="daftar-ml",
-    version=about.get("__version__", "0.1.1"),
+    version=about.get("__version__", "0.1.2"),
     author="Melie",
     author_email="drtinamelie@gmail.com",
     url="https://github.com/tmelie/DAFTAR-ML",
