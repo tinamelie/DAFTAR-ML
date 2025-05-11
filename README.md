@@ -384,31 +384,46 @@ daftar --input preprocessed_data.csv --target target_column --id id_column --mod
 
 ## Results and Output Explanation
 
-Each run creates a folder inside the current directory (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`).
+Each run creates a results folder in the current directory (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`). The directory name follows the pattern: `DAFTAR-ML_[target]_[model]_[task]_cv[outer]x[inner]x[repeats]`.
 
 ### Output Structure Overview
 
 ```
-results/
-└── DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
-    ├── DAFTAR-ML_run.log                     # Combined console + file log
-    ├── metrics_overall.csv                   # Mean scores across folds
-    ├── feature_importance/                   # Feature importance directory
-    │   ├── feature_importance_values_fold.csv  # Fold-level feature importance
-    │   ├── feature_importance_values_sample.csv # Sample-level feature importance 
-    │   ├── feature_importance_bar_fold.png    # Fold-level importance visualization
-    │   └── feature_importance_bar_sample.png  # Sample-level importance visualization
-    ├── shap_*.png                            # SHAP summary visualizations
-    ├── shap_feature_metrics.csv              # Feature statistics with both calculation methods
-    ├── shap_features_summary.txt             # Comprehensive feature analysis and rankings
-    ├── shap_values_all_folds.csv             # Combined SHAP values from all folds
-    ├── predictions_vs_actual_overall.csv     # Combined predictions from all folds
-    ├── density_actual_vs_pred_global.png     # Regression density plot
-    ├── figures_explanation.txt               # Detailed explanation of all output files
-    ├── fold_1/ … fold_N/                     # Individual fold directories (described below)
+DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
+├── DAFTAR-ML_[timestamp].log          # Complete run log with all console output
+├── metrics_overall.csv                # Mean scores across folds
+├── feature_importance/                # Feature importance directory
+│   ├── feature_importance_values_fold.csv    # Fold-level feature importance
+│   ├── feature_importance_values_sample.csv  # Sample-level feature importance 
+│   ├── feature_importance_bar_fold.png       # Fold-level importance visualization
+│   └── feature_importance_bar_sample.png     # Sample-level importance visualization
+├── shap_beeswarm_fold.png             # SHAP value distribution visualization
+├── shap_beeswarm_sample.png           # SHAP value distribution visualization
+├── shap_bar_fold.png                  # Top 25 positive/negative impact features
+├── shap_bar_sample.png                # Top 25 positive/negative impact features
+├── shap_feature_metrics.csv           # Feature statistics with both calculation methods
+├── shap_features_summary.txt          # Comprehensive feature analysis and rankings
+├── shap_values_all_folds.csv          # Combined SHAP values from all folds
+├── predictions_vs_actual_overall.csv  # Combined predictions from all folds
+├── confusion_matrix_global.png        # Overall confusion matrix (classification only)
+├── density_actual_vs_pred_global.png  # Regression density plot (regression only)
+├── performance.txt                    # Human-readable summary of model performance
+├── figures_explanation.txt            # Detailed explanation of all output files
+├── fold_1/                            # Individual fold directory
+│   ├── best_model_fold_1.pkl          # Trained model for this fold
+│   ├── confusion_matrix_fold_1.png    # Confusion matrix (classification only)
+│   ├── feature_importance_fold_1.csv  # Feature importance rankings
+│   ├── fold_1_distribution.png        # Train/test target distribution histogram
+│   ├── fold_1_samples.csv             # List of samples with ID, target value and set (Train/Test)
+│   ├── optuna_plots/                  # Hyperparameter optimization visualizations
+│   ├── predictions_vs_actual_fold_1.csv # Test set predictions for this fold
+│   └── shap_values_fold_1.csv         # SHAP values for this fold
+└── fold_2/ ... fold_N/                # Additional fold directories
 ```
 
 ### Global Output Files
+
+These files summarize results across all folds:
 
 #### Performance Metrics:
 * `metrics_overall.csv`: Summary of model performance metrics across all folds
@@ -434,7 +449,7 @@ results/
 * `density_actual_vs_pred_global.png`: Distribution of predictions vs actual (regression)
 
 #### Documentation:
-* `DAFTAR-ML_run.log`: Complete run log with all console output
+* `DAFTAR-ML_[timestamp].log`: Complete run log with all console output
 * `figures_explanation.txt`: Detailed explanations of all output visualizations
 * `config.json`: Record of all settings used in the analysis
 
@@ -457,9 +472,8 @@ Each fold directory (`fold_N/`) contains fold-specific outputs:
 * `feature_importance_fold_N.csv`: Feature importance rankings
 
 #### Hyperparameter Tuning:
-* `optuna_trials_fold_N.csv`: All hyperparameter combinations tested
-* `optuna_importance_fold_N.png`: Parameter importance visualization
-* `optuna_parallel_coordinate_fold_N.png`: Parallel coordinates plot
+* `optuna_plots/`: Directory containing parameter importance visualization
+* `hyperparameter_tuning_summary_foldN.txt`: Summary of hyperparameter optimization
 
 ### Understanding SHAP Analysis
 
@@ -533,7 +547,7 @@ DAFTAR-ML includes a utility to display all the color palettes used in its visua
 daftar-colors --output_dir output_directory
 ```
 
-All DAFTAR-ML visualizations use a centralized color management system (in `daftar/viz/colors.py`) to ensure consistent styling across all outputs.
+All DAFTAR-ML visualizations use a centralized color management system (in `daftar/viz/color_definitions.py`) to ensure consistent styling across all outputs.
 
 ## Citing DAFTAR-ML
 

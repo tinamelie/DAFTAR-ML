@@ -1,0 +1,25 @@
+===== DAFTAR-ML Performance Metrics =====
+
+Overall Performance Metrics
+------------------------
+These values represent the AVERAGE performance across all CV folds.
+Calculation method: Each metric is calculated for individual folds, then averaged.
+
+Accuracy: 0.7186153
+F1 Score: 0.7144491
+ROC AUC:  0.7910643
+
+Per-Fold Metrics
+---------------
+These values are calculated for each fold independently.
+
+Fold 1:
+  accuracy:  0.7179931
+  f1:  0.7142321
+  roc_auc:  0.7790429
+
+Fold 2:
+  accuracy:  0.7192374
+  f1:  0.7146660
+  roc_auc:  0.8030856
+
