@@ -23,7 +23,7 @@ if init_path.exists():
                 break
 
 description = (
-    "Data-Agnostic Feature-Target Analysis & Ranking Machine Learning Pipeline "
+    "Data-Agnostic Feature-Target Analysis & Ranking Machine Learning Pipeline"
     "(DAFTAR-ML)."
 )
 

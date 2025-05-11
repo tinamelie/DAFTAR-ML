@@ -17,6 +17,13 @@ DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **
 - Scores features using SHAPley Additive exPlanations (SHAP)
 - Generates publication-quality visualizations
 
+## Installation
+
+You can install DAFTAR-ML directly from GitHub:
+
+```bash
+pip install git+https://github.com/tinamelie/DAFTAR-ML.git
+```
 
 ## Quick Start
 
@@ -451,7 +458,7 @@ If you use DAFTAR-ML in academic work, please cite:
 
 ```
 @software{daftar2025,
-  author  = {The DAFTAR-ML Team},
+  author  = {Melie, Tina},
   title   = {DAFTAR-ML},
   year    = {2025},
   url     = {https://github.com/tinamelie/DAFTAR-ML},

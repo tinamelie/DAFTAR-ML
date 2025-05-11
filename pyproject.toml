@@ -5,17 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "daftar-ml"
 version = "0.1.2"
-description = "DAFTAR-ML: Feature Importance via Repeated Annotation of Trees"
+description = "Data-Agnostic Feature-Target Analysis & Ranking Machine Learning Pipeline (DAFTAR-ML)"
 requires-python = ">=3.8"
 readme = "README.md"
 license = {file = "LICENSE"}
 
 authors = [
-    {name = "The DAFTAR-ML Team"}
+    {name = "Tina Melie"}
 ]
 
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License ::...", 
     "Operating System :: OS Independent",
 ] 
