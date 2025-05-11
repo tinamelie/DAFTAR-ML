@@ -441,7 +441,8 @@ def evaluate_fold_quality(
     y: pd.Series,
     cv_splitter: Union[RepeatedKFold, RepeatedStratifiedKFold],
     is_classification: bool,
-    alpha: float = 0.05
+    alpha: float = 0.05,
+    repeats: int = 1
 ) -> Tuple[List[float], List[str], List[str]]:
     """Evaluate the quality of CV folds using statistical tests.
     
@@ -450,6 +451,7 @@ def evaluate_fold_quality(
         cv_splitter: CV splitter object
         is_classification: Whether the task is classification
         alpha: Significance level for statistical tests
+        repeats: Number of repeats to evaluate
         
     Returns:
         Tuple of (p_values, marks, quality_lines)
@@ -462,13 +464,13 @@ def evaluate_fold_quality(
     quality_lines.append(f"[✗] p-value < {alpha:.2f}: Potential fold imbalance")
     quality_lines.append("")
     
-    # We only evaluate the first repeat for simplicity
-    first_repeat_splits = []
-    for rep, fold, tr, te in _outer_splits(cv_splitter, y, repeats=1):
-        if rep == 1:
-            first_repeat_splits.append((tr, te, fold))
+    # Evaluate all repeats up to the specified number
+    all_splits = []
+    for rep, fold, tr, te in _outer_splits(cv_splitter, y, repeats=repeats):
+        if rep <= repeats:
+            all_splits.append((rep, fold, tr, te))
     
-    for idx, (tr, te, fold_num) in enumerate(first_repeat_splits, start=1):
+    for rep, fold, tr, te in all_splits:
         tr_y, te_y = y.iloc[tr], y.iloc[te]
         if is_classification:
             all_classes = sorted(set(tr_y) | set(te_y))
@@ -488,7 +490,9 @@ def evaluate_fold_quality(
         pvals.append(pval)
         mark = "✓" if pval >= alpha else "✗"
         marks.append(mark)
-        quality_lines.append(f"  [{mark}] Fold {fold_num}: p‑value={pval:.4f}")
+        # Calculate overall fold number for consistent reference with fold files
+        overall_fold_num = (rep - 1) * (len(all_splits) // repeats) + fold
+        quality_lines.append(f"  [{mark}] Repeat {rep}, Fold {fold} (overall fold {overall_fold_num}): p‑value={pval:.4f}")
     
     return pvals, marks, quality_lines
 
@@ -775,13 +779,15 @@ def main() -> None:
         # Store quality lines for this repeat
         quality_lines = []
         for (fold, _, _), pval, mark in zip(rep_fold_idxs, pvals, marks):
-            quality_lines.append(f"  [{mark}] Repeat {rep}, Fold {fold}: p‑value={pval:.4f}")
+            # Calculate overall fold number for consistent reference with fold files
+            overall_fold_num = (rep - 1) * len(fold_data) + fold
+            quality_lines.append(f"  [{mark}] Repeat {rep}, Fold {fold} (overall fold {overall_fold_num}): p‑value={pval:.4f}")
         
         quality_lines_by_repeat[rep] = quality_lines
     
     # Calculate p-values for fold quality assessment for reporting purposes
-    # This is for the first repeat only for reporting
-    report_pvals, report_marks, report_quality_lines = evaluate_fold_quality(y, outer_cv, is_cls, args.alpha)
+    # This includes all repeats
+    report_pvals, report_marks, report_quality_lines = evaluate_fold_quality(y, outer_cv, is_cls, args.alpha, args.repeats)
 
     # Fold-wise histograms
     n_splits = args.outer
@@ -957,17 +963,18 @@ def main() -> None:
     report_lines.extend(quality_header)
     console_lines.extend(quality_header)
     report_lines.extend(report_quality_lines)
-    console_lines.extend(quality_lines_by_repeat[1])
+    console_lines.extend(report_quality_lines)  # Use the same quality lines for console output
 
     # Summary section
     good = sum(1 for p in report_pvals if p >= args.alpha)
+    total_folds = len(report_pvals)
     summary_lines = [
         "",
         "SUMMARY",
         "-" * 40,
-        f"{good}/{len(report_pvals)} folds have sufficiently similar distributions.",
+        f"{good}/{total_folds} folds have sufficiently similar distributions.",
     ]
-    if good < 0.8 * len(report_pvals):
+    if good < 0.8 * total_folds:
         summary_lines += [
             "",
             "⚠️  WARNING: Too many imbalanced folds. Consider a different seed.",
