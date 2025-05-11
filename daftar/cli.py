@@ -54,7 +54,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     """
     parser = argparse.ArgumentParser(description="DAFTAR-ML: Feature Importance via Repeated Annotation of Trees", 
         formatter_class=CustomHelpFormatter,
-        usage="daftar --input preprocessed.csv --target COLUMN --id COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task {regression,classification}] [--metric NAME] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
+        usage="daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task {regression,classification}] [--metric NAME] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
     )
     
     # Customize help message to capitalize 'Show'
