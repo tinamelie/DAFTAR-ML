@@ -384,96 +384,45 @@ daftar --input preprocessed_data.csv --target target_column --id id_column --mod
 
 ## Results and Output Explanation
 
-Each run creates a results folder in the current directory (or the path specified by `--output_dir` or `DAFTAR-ML_RESULTS_DIR`). The directory name follows the pattern: `DAFTAR-ML_[target]_[model]_[task]_cv[outer]x[inner]x[repeats]`.
+Each run creates a folder in either:
+- The current directory
+- The directory specified by `--output_dir`
+- The directory specified by the `DAFTAR-ML_RESULTS_DIR` environment variable
 
 ### Output Structure Overview
 
 ```
 DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
-├── DAFTAR-ML_[timestamp].log          # Complete run log with all console output
-├── metrics_overall.csv                # Mean scores across folds
-├── feature_importance/                # Feature importance directory
-│   ├── feature_importance_values_fold.csv    # Fold-level feature importance
-│   ├── feature_importance_values_sample.csv  # Sample-level feature importance 
-│   ├── feature_importance_bar_fold.png       # Fold-level importance visualization
-│   └── feature_importance_bar_sample.png     # Sample-level importance visualization
-├── shap_beeswarm_fold.png             # SHAP value distribution visualization
-├── shap_beeswarm_sample.png           # SHAP value distribution visualization
-├── shap_bar_fold.png                  # Top 25 positive/negative impact features
-├── shap_bar_sample.png                # Top 25 positive/negative impact features
-├── shap_feature_metrics.csv           # Feature statistics with both calculation methods
-├── shap_features_summary.txt          # Comprehensive feature analysis and rankings
-├── shap_values_all_folds.csv          # Combined SHAP values from all folds
-├── predictions_vs_actual_overall.csv  # Combined predictions from all folds
-├── confusion_matrix_global.png        # Overall confusion matrix (classification only)
-├── density_actual_vs_pred_global.png  # Regression density plot (regression only)
-├── performance.txt                    # Human-readable summary of model performance
-├── figures_explanation.txt            # Detailed explanation of all output files
-├── fold_1/                            # Individual fold directory
-│   ├── best_model_fold_1.pkl          # Trained model for this fold
-│   ├── confusion_matrix_fold_1.png    # Confusion matrix (classification only)
-│   ├── feature_importance_fold_1.csv  # Feature importance rankings
-│   ├── fold_1_distribution.png        # Train/test target distribution histogram
-│   ├── fold_1_samples.csv             # List of samples with ID, target value and set (Train/Test)
-│   ├── optuna_plots/                  # Hyperparameter optimization visualizations
-│   ├── predictions_vs_actual_fold_1.csv # Test set predictions for this fold
-│   └── shap_values_fold_1.csv         # SHAP values for this fold
-└── fold_2/ ... fold_N/                # Additional fold directories
+├── DAFTAR-ML_run.log                     # Combined console + file log
+├── metrics_overall.csv                   # Mean scores across folds
+├── feature_importance/                   # Feature importance directory
+│   ├── feature_importance_values_fold.csv  # Fold-level feature importance
+│   ├── feature_importance_values_sample.csv # Sample-level feature importance 
+│   ├── feature_importance_bar_fold.png    # Fold-level importance visualization
+│   └── feature_importance_bar_sample.png  # Sample-level importance visualization
+├── shap_*.png                            # SHAP summary visualizations
+├── shap_feature_metrics.csv              # Feature statistics with both calculation methods
+├── shap_features_summary.txt             # Comprehensive feature analysis and rankings
+├── shap_values_all_folds.csv             # Combined SHAP values from all folds
+├── predictions_vs_actual_overall.csv     # Combined predictions from all folds
+├── density_actual_vs_pred_global.png     # Regression density plot
+├── figures_explanation.txt               # Detailed explanations of all output visualizations
+├── config.json                           # Record of all settings used in the analysis
+└── fold_1/ … fold_N/                     # Individual fold directories
+    ├── best_model_fold_N.pkl             # Trained model for this fold
+    ├── test_indices_fold_N.csv           # Sample indices used in test set
+    ├── predictions_vs_actual_fold_N.csv  # Test set predictions for this fold
+    ├── fold_N_samples.csv                # List of samples with Train/Test sets
+    ├── fold_N_distribution.png           # Train/test target distribution histogram
+    ├── confusion_matrix_fold_N.png       # Confusion matrix (classification)
+    ├── shap_values_fold_N.csv            # SHAP values for this fold
+    ├── feature_importance_fold_N.csv     # Feature importance rankings
+    ├── optuna_trials_fold_N.csv          # All hyperparameter combinations tested
+    ├── optuna_importance_fold_N.png      # Parameter importance visualization
+    └── optuna_parallel_coordinate_fold_N.png # Parallel coordinates plot
 ```
 
-### Global Output Files
 
-These files summarize results across all folds:
-
-#### Performance Metrics:
-* `metrics_overall.csv`: Summary of model performance metrics across all folds
-* `performance.txt`: Human-readable summary of model performance
-
-#### SHAP Analysis Files:
-* `shap_beeswarm_sample.png` & `shap_beeswarm_fold.png`: SHAP value distribution visualizations
-* `shap_bar_sample.png` & `shap_bar_fold.png`: Top 25 positive/negative impact features
-* `shap_corr_bar_sample.png` & `shap_corr_bar_fold.png`: Target correlations (regression only)
-* `shap_feature_metrics.csv`: Statistical summary of feature impact
-* `shap_features_summary.txt`: Comprehensive feature analysis and rankings
-* `shap_values_all_folds.csv`: Combined SHAP values from all folds
-
-#### Feature Importance Analysis:
-* `feature_importance/feature_importance_values_fold.csv`: Fold-level importance
-* `feature_importance/feature_importance_values_sample.csv`: Sample-level importance
-* `feature_importance/feature_importance_bar_fold.png`: Bar plot of fold-level importance
-* `feature_importance/feature_importance_bar_sample.png`: Bar plot of sample-level importance
-
-#### Predictions and Evaluation:
-* `predictions_vs_actual_overall.csv`: Combined predictions across all folds
-* `confusion_matrix_global.png`: Overall confusion matrix (classification)
-* `density_actual_vs_pred_global.png`: Distribution of predictions vs actual (regression)
-
-#### Documentation:
-* `DAFTAR-ML_[timestamp].log`: Complete run log with all console output
-* `figures_explanation.txt`: Detailed explanations of all output visualizations
-* `config.json`: Record of all settings used in the analysis
-
-### Per-Fold Output Files
-
-Each fold directory (`fold_N/`) contains fold-specific outputs:
-
-#### Model Files:
-* `best_model_fold_N.pkl`: Trained model for this fold
-* `test_indices_fold_N.csv`: Sample indices used in test set
-
-#### Predictions & Sample Information:
-* `predictions_vs_actual_fold_N.csv`: Test set predictions for this fold
-* `fold_N_samples.csv`: List of samples with ID, target value and set (Train/Test)
-
-#### Analysis Files:
-* `fold_N_distribution.png`: Train/test target distribution histogram
-* `confusion_matrix_fold_N.png`: Confusion matrix (classification)
-* `shap_values_fold_N.csv`: SHAP values for this fold
-* `feature_importance_fold_N.csv`: Feature importance rankings
-
-#### Hyperparameter Tuning:
-* `optuna_plots/`: Directory containing parameter importance visualization
-* `hyperparameter_tuning_summary_foldN.txt`: Summary of hyperparameter optimization
 
 ### Understanding SHAP Analysis
 
@@ -566,3 +515,25 @@ If you use DAFTAR-ML in academic work, please cite:
 ---
 
 For questions, feature requests or bug reports please open an issue on GitHub.
+
+## Testing and Validation
+
+All key functionality in DAFTAR-ML is validated with multiple test datasets and cross-checks. The repository includes both binary classification and continuous regression test datasets for functional verification.
+
+### CV Seed Consistency 
+
+DAFTAR-ML ensures that when the same random seed is provided:
+- Cross-validation splits remain identical across different runs
+- Stratified cross-validation for classification tasks maintains consistent class distribution
+- Different random seeds produce different split patterns
+
+This consistency applies to:
+- Regular K-Fold cross-validation
+- Stratified K-Fold cross-validation for classification tasks
+- RepeatedKFold for robust performance estimation
+
+### Performance Evaluation Metrics
+
+DAFTAR-ML supports various metrics for evaluating model performance:
+
+// ... existing code ...
