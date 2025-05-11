@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daftar-ml"
+version = "0.1.2"
+description = "DAFTAR-ML: Feature Importance via Repeated Annotation of Trees"
+requires-python = ">=3.8"
+readme = "README.md"
+license = {file = "LICENSE"}
+
+authors = [
+    {name = "The DAFTAR-ML Team"}
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+] 
