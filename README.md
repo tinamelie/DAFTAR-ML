@@ -2,7 +2,7 @@
  
 DAFTAR-ML is a specialized machine learning pipeline that identifies relevant **features** based on their relationship to a **target** variable. It supports both regression and classification tasks. DAFTAR-ML expects a single CSV file with one target column and any number of feature columns.
 
-While typical workflows fit models that predict targets from features, DAFTAR-ML instead evaluates each feature’s relationship to the target and produces a ranked list of the most impactful features.
+While typical workflows fit models that predict targets from features, DAFTAR-ML instead evaluates each feature's relationship to the target and produces a ranked list of the most impactful features.
 
 ### Use Cases
 
@@ -44,7 +44,7 @@ DAFTAR‑ML expects a comma‑separated file (csv) with:
 | Species2 |      **0**      |       8       |       1       |       6       |
 | Species3 |     **0.01**    |       0       |       4       |       3       |
 
-In this gene–phenotype example, OrthoFinder gene clusters are our **features**, and the **target** column (Xylose_growth) records each species’ growth rate in xylose. DAFTAR-ML will reveal which **features** most strongly drive that target.
+In this gene–phenotype example, OrthoFinder gene clusters are our **features**, and the **target** column (Xylose_growth) records each species' growth rate in xylose. DAFTAR-ML will reveal which **features** most strongly drive that target.
 
 ### Results example (summary):
 | Rank |    Feature    |  SHAP Score |
@@ -251,7 +251,7 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 
 ##### Analysis Configuration:
 * `--task {regression,classification}`: Problem type (regression or classification). Auto-detected if not specified
-* `--metric NAME`: Performance metric to optimize. For regression: 'mse', 'rmse', 'mae', 'r2'; for classification: 'accuracy', 'f1', 'roc_auc' (default: 'mse' for regression, 'accuracy' for classification)
+* `--metric {mse,rmse,mae,r2,accuracy,f1,roc_auc}`: Performance metric to optimize. For regression: 'mse', 'rmse', 'mae', 'r2'; for classification: 'accuracy', 'f1', 'roc_auc' (default: 'mse' for regression, 'accuracy' for classification)
 
 ##### Cross-validation Configuration:
 * `--outer INTEGER`: Number of partitions for the outer CV loop, which evaluates model performance (default: 5)
@@ -304,7 +304,6 @@ These plots show detailed impact of features on individual predictions:
 Patterns to look for:
 * Linear relationships: Consistent color gradient from left to right
 * Non-linear effects: Same colors appearing on both sides
-* Interactions: Unexpected patterns in dot distribution
 
 ##### Bar Plots
 The summary bar plots show average magnitude of feature impacts:
@@ -316,12 +315,6 @@ For regression problems, correlation plots show relationship between feature SHA
 * Red bars (positive correlation): Higher feature values → higher predictions
 * Blue bars (negative correlation): Higher feature values → lower predictions
 
-#### Comparing Different Rankings
-
-These plots help identify patterns such as:
-* Linear relationships: Consistent color gradient from left to right
-* Non-linear effects: Same colors appearing on both sides of the zero line
-* Interactions: Unexpected patterns in the distribution of dots
 
 ### Output Structure Overview
 
@@ -462,3 +455,22 @@ If you use DAFTAR-ML in academic work, please cite:
 ---
 
 For questions, feature requests or bug reports please open an issue on GitHub.
+
+## Release Notes
+
+### Version 0.1.3 (Visualization Enhancements)
+
+This release focuses on improving the visualization toolkit with several enhancements:
+
+* **Confusion Matrix Improvements**: Added black outlines to confusion matrix visualizations with configurable linewidth for better readability and cell boundary visibility
+* **Color Organization**: Removed REGRESSION_HIST_COLOR and standardized to use REGRESSION_COLOR with proper alpha transparency
+* **Background Colors**: Added dedicated background colors for different plot types:
+  - HISTOGRAM_BG_COLOR for regression histograms
+  - CLASSIFICATION_BAR_BG_COLOR for classification charts
+  - DENSITY_PLOT_BG_COLOR for density plots
+  - CORRELATION_BAR_BG for correlation plots
+* **Alpha Transparency Fix**: Updated REGRESSION_HIST_ALPHA from 0 to 0.6 for proper visualization
+* **CLI Help Text**: Improved formatting of command-line help text with standardized parameter descriptions
+* **Color System**: Centralized all color definitions in color_definitions.py for easier customization and consistency
+
+These improvements ensure more consistent, readable, and visually appealing outputs across all visualization types in DAFTAR-ML.
