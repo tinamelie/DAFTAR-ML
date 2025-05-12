@@ -29,19 +29,20 @@ pip install git+https://github.com/tinamelie/DAFTAR-ML.git
 
 DAFTAR‑ML expects a comma‑separated file (csv) with:
 
-- id_column: Unique sample identifier
-- target_column: Continuous or categorical response
+- Unique sample identifier (--id)
+- Continuous or categorical response (--target)
 - Features for prediction
  
-
- id_column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
-| Species | **Growth_on_Galactose** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
+**input.csv example:**
+<br>
+ Identifier&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Target column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
+| Species | **Xylose_growth** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
 |----------|:---------------:|:-------------:|:-------------:|:-------------:|
 | Species1 |     **0.34**    |       10      |       0       |       15      |
 | Species2 |      **0**      |       8       |       1       |       6       |
 | Species3 |     **0.01**    |       0       |       4       |       3       |
 
-In this gene-phenotype example, we use gene clusters OrthoFinder as our **features**. The **target** column, Growth_on_Galactose, is growth rates of species in galactose medium. The aim is to identify which gene clusters (**features**) are important to this **target**, i.e. which gene clusters are relevant to growth on galactose. 
+In this gene-phenotype example, we use gene clusters OrthoFinder as our **features**. The **target** column, Xylose_growth, is growth rates of species on xylose medium. The aim is to identify which gene clusters (**features**) are important to this **target**, i.e. which gene clusters are relevant to growth on xylose. 
 ### Results example (summary):
 | Rank |    Feature    |  SHAP Score |
 |------|:-------------:|:------:|
@@ -60,26 +61,26 @@ A typical DAFTAR-ML workflow consists of three steps:
 
 ### 1. Preprocess raw data (optional)
 ```bash
-daftar-preprocess --input PATH --target COLUMN --id COLUMN
+daftar-preprocess --input input.csv --target Xylose_growth --id Species
 ```
 
 ### 2. Visualize CV splits (optional)
 ```bash
-daftar-cv --input PATH --target COLUMN --id COLUMN
+daftar-cv --input preprocessed_input.csv --target Xylose_growth --id Species
 ```
 
-### 3. Run the main pipeline
+### 3. Run the main pipeline (XGBoost)
 ```
-daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf}
+daftar --input preprocessed_input.csv --target Xylose_growth --id Species --model {xgb,rf} --seed 893200
 ```
+
 ## Input Data
 
 DAFTAR-ML expects a comma-separated (.csv) matrix with the following columns:
 
-- **ID**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--id COLUMN`.
+- **Identifier**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--id COLUMN`.
 - **Target**: Response variable to predict (e.g., growth rate, yield, etc.). May be continuous (regression) or categorical (binary or multiclass classification). Specify with `--target COLUMN`.     
 - **Features**: Predictor columns (e.g., orthologous gene counts, CAI values, expression profiles).
-
 
  **Target Variable Requirements:**  
  - Each dataset must have exactly **one target column**.
@@ -100,18 +101,18 @@ daftar-preprocess --input PATH --target COLUMN --id COLUMN --output_dir PATH
 The preprocessing module uses mutual information to select features with the strongest relationship to the target variable, without assuming linearity. It selects the top-k features with highest MI scores, reducing dimensionality while preserving predictive power. Results include a summary report of transformations and selected features. Produces the following files:
 
 **Preprocessed Data:**
-- `[filename]_MI500_classif.csv`: The preprocessed dataset with selected features and transformed values.
+- `[filename]_MI500_[problemtype].csv`: The preprocessed dataset with selected features and transformed values.
 
 **Feature Importance Rankings:**
-- `[filename]_MI500_classif_feature_scores.csv`: A CSV file containing the mutual information scores for each feature.
+- `[filename]_MI500_[problemtype]_feature_scores.csv`: A CSV file containing the mutual information scores for each feature.
 
 **Summary Report:**
-- `[filename]_MI500_classif_report.txt`: A text file containing a summary of the preprocessing steps and selected features.
+- `[filename]_MI500_[problemtype]_report.txt`: A text file containing a summary of the preprocessing steps and selected features.
 
 #### Required Parameters:
 * `--input PATH`: Path to input CSV file
 * `--target COLUMN`: Target column name to predict
-* `--id COLUMN`: Name of the ID column (e.g., species identifiers, sample names)
+* `--id COLUMN`: Name of the identifier column (e.g., species identifiers, sample names)
 
 #### Optional Parameters:
 
@@ -163,7 +164,7 @@ daftar-cv --input PATH --target COLUMN --id COLUMN --outer INTEGER --inner INTEG
 #### Required Parameters:
 * `--input PATH`: Path to the preprocessed CSV file containing your feature data
 * `--target COLUMN`: Name of the target column to predict
-* `--id COLUMN`: Name of the ID column (e.g., species identifiers, sample names)
+* `--id COLUMN`: Name of the identifier column (e.g., species, sample names)
 
 #### Optional Parameters:
 
@@ -239,7 +240,7 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 #### Required Parameters:
 * `--input PATH`: Path to the preprocessed CSV file containing features and target variable
 * `--target COLUMN`: Name of the target column to predict in the input file
-* `--id COLUMN`: Name of the ID column (e.g., species identifiers, sample names)
+* `--id COLUMN`: Name of the identifier column (e.g., species, sample names)
 * `--model {xgb,rf}`: Machine learning algorithm to use (xgb=XGBoost, rf=Random Forest)
 
 #### Optional Parameters:
