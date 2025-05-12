@@ -105,13 +105,14 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # across different folds (1.0 = perfectly consistent direction)
     fold_consistency = (sign_matrix == global_sign).sum(axis=0) / sign_matrix.shape[0]
 
+    # Calculate fold-level metrics
     shap_signed_df = pd.DataFrame({
-        "Mean_Signed": mean_signed,
-        "Std_MeanAcrossFolds": std_across,
-        "Impact_Magnitude": np.abs(mean_signed),
-        "Impact_Direction": ["Positive" if v > 0 else "Negative" if v < 0 else "Neutral"
-                            for v in mean_signed]
-        # Fold_Consistency removed as requested
+        "Fold_Mean_SHAP": mean_signed,
+        "Fold_SHAP_StdDev": std_across,
+        "Fold_Impact_Magnitude": np.abs(mean_signed),
+        "Fold_Impact_Direction": ["Positive" if v > 0 else "Negative" if v < 0 else "Neutral"
+                            for v in mean_signed],
+        "Fold_Presence": fold_consistency
     }, index=overall_X_test.columns)
 
     # ----------------------------
@@ -129,6 +130,17 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     sample_level_importance_df = pd.DataFrame({
         "Sample_Level_Impact": sample_level_importance
     }, index=overall_X_test.columns)
+    
+    # Calculate sample-level mean SHAP values
+    sample_mean_shap = overall_shap_values.mean(axis=0)
+    sample_shap_stddev = overall_shap_values.std(axis=0)
+    
+    # Add sample-level metrics to the main dataframe
+    shap_signed_df["Sample_Mean_SHAP"] = sample_mean_shap
+    shap_signed_df["Sample_SHAP_StdDev"] = sample_shap_stddev
+    shap_signed_df["Sample_Impact_Magnitude"] = np.abs(sample_mean_shap)
+    shap_signed_df["Sample_Impact_Direction"] = ["Positive" if v > 0 else "Negative" if v < 0 else "Neutral"
+                                        for v in sample_mean_shap]
     
     # Create sample-level beeswarm plot with explicit sample-level ordering
     # Sort features by their sample-level impact
@@ -252,11 +264,11 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     sample_df = shap_signed_df.copy()
     
     # Sort by sample-level impact and separate positive/negative
-    neg_sample = sample_df[sample_df["Mean_Signed"] < 0].copy()
+    neg_sample = sample_df[sample_df["Sample_Impact_Direction"] == "Negative"].copy()
     neg_sample["abs_val"] = neg_sample["Sample_Level_Impact"]
     neg_sample = neg_sample.nlargest(top_n, "abs_val")
 
-    pos_sample = sample_df[sample_df["Mean_Signed"] > 0].copy()
+    pos_sample = sample_df[sample_df["Sample_Impact_Direction"] == "Positive"].copy()
     pos_sample = pos_sample.nlargest(top_n, "Sample_Level_Impact")
     pos_sample = pos_sample.iloc[::-1]  # So largest positive is at top
 
@@ -270,8 +282,8 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
 
     # Use colors that match the legend
     # #AB0264 (dark pink/red) for positive values, #3E95B5 (blue) for negative values
-    colors = [pos_color if x > 0 else neg_color for x in bar_sample_df["Mean_Signed"]]
-    ax.barh(ys, bar_sample_df["Mean_Signed"], height=0.7, color=colors, alpha=1, zorder=2)
+    colors = [pos_color if x > 0 else neg_color for x in bar_sample_df["Sample_Impact_Magnitude"]]
+    ax.barh(ys, bar_sample_df["Sample_Impact_Magnitude"], height=0.7, color=colors, alpha=1, zorder=2)
 
     # Set feature names as y-axis labels
     ax.set_yticks(ys)
@@ -284,7 +296,7 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     xmin, xmax = ax.get_xlim()
     epsilon = (xmax - xmin) * 0.01
     for y, (_, row) in zip(ys, bar_sample_df.iterrows()):
-        v = row["Mean_Signed"]
+        v = row["Sample_Impact_Magnitude"]
         label = format_scientific(v, cutoff=0.01, sig=4, sci_sig=1)
         if v < 0:
             x_text = v - epsilon
@@ -338,11 +350,11 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     fold_df = shap_signed_df.copy()
     
     # Sort by fold-level impact (not presence!) and separate positive/negative
-    neg_fold = fold_df[fold_df["Mean_Signed"] < 0].copy()
+    neg_fold = fold_df[fold_df["Fold_Level_Impact"] < 0].copy()
     neg_fold["abs_val"] = neg_fold["Fold_Level_Impact"]
     neg_fold = neg_fold.nlargest(top_n, "abs_val")
 
-    pos_fold = fold_df[fold_df["Mean_Signed"] > 0].copy()
+    pos_fold = fold_df[fold_df["Fold_Level_Impact"] > 0].copy()
     pos_fold = pos_fold.nlargest(top_n, "Fold_Level_Impact")
     pos_fold = pos_fold.iloc[::-1]  # So largest positive is at top
 
@@ -356,16 +368,16 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
 
     # Draw error bars with caps to show cross-fold variation
     for y, (_, row) in zip(ys, bar_fold_df.iterrows()):
-        v = row["Mean_Signed"]
-        e = row["Std_MeanAcrossFolds"]
+        v = row["Fold_Level_Impact"]
+        e = row["Fold_SHAP_StdDev"]
         ax.plot([v - e, v + e], [y, y], color="black", lw=1, alpha=0.7, zorder=1)
         ax.vlines([v - e, v + e], y - cap_width, y + cap_width,
                   colors="black", lw=1, alpha=0.7, zorder=1)
 
     # Use colors that match the legend
     # #AB0264 (dark pink/red) for positive values, #3E95B5 (blue) for negative values
-    colors = [pos_color if x > 0 else neg_color for x in bar_fold_df["Mean_Signed"]]
-    ax.barh(ys, bar_fold_df["Mean_Signed"], height=0.7, color=colors, alpha=1, zorder=2)
+    colors = [pos_color if x > 0 else neg_color for x in bar_fold_df["Fold_Level_Impact"]]
+    ax.barh(ys, bar_fold_df["Fold_Level_Impact"], height=0.7, color=colors, alpha=1, zorder=2)
 
     # Set feature names as y-axis labels
     ax.set_yticks(ys)
@@ -378,8 +390,8 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     xmin, xmax = ax.get_xlim()
     epsilon = (xmax - xmin) * 0.01
     for y, (_, row) in zip(ys, bar_fold_df.iterrows()):
-        v = row["Mean_Signed"]
-        e = row["Std_MeanAcrossFolds"]
+        v = row["Fold_Level_Impact"]
+        e = row["Fold_SHAP_StdDev"]
         label = format_scientific(v, cutoff=0.01, sig=4, sci_sig=1)
         if v < 0:
             x_text = v - e - epsilon
@@ -425,14 +437,16 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
 
     # Calculate correlation between SHAP values and feature values
     print("Calculating SHAP‑target correlations...")
-    signed_corrs = {}
+    fold_level_corrs = {}
+    sample_level_corrs = {}
     
     if problem_type == "classification":
         # Set correlations to 0 for classification - not meaningful in this context
         for feature in overall_X_test.columns:
-            signed_corrs[feature] = 0
+            fold_level_corrs[feature] = 0
+            sample_level_corrs[feature] = 0
     else:
-        # Calculate actual correlations for regression
+        # Calculate fold-level correlations for regression
         for feature in overall_X_test.columns:
             fold_corrs = []
             for fold in fold_results:
@@ -449,10 +463,61 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
                     except:
                         corr = 0
                     fold_corrs.append(corr)
-            signed_corrs[feature] = np.mean(fold_corrs) if fold_corrs else 0
+            fold_level_corrs[feature] = np.mean(fold_corrs) if fold_corrs else 0
+            
+        # Calculate sample-level correlations
+        # First, collect all SHAP values and target values across all folds
+        all_shap_values = {}
+        all_targets = []
+        
+        for fold in fold_results:
+            if 'shap_data' not in fold or fold['shap_data'] is None:
+                continue
+                
+            shap_vals, X_test, y_test = fold['shap_data']
+            if shap_vals is None or X_test is None or y_test is None:
+                continue
+                
+            # For each feature, collect all SHAP values from this fold
+            for j, feature in enumerate(X_test.columns):
+                if j >= shap_vals.shape[1]:
+                    continue
+                if feature not in all_shap_values:
+                    all_shap_values[feature] = []
+                    
+                all_shap_values[feature].extend(shap_vals[:, j].tolist())
+            
+            # Add target values from this fold
+            all_targets.extend(y_test.tolist())
+        
+        # Now calculate correlations for each feature using all samples
+        for feature, shap_vals in all_shap_values.items():
+            if len(shap_vals) == len(all_targets) and len(shap_vals) > 0:
+                try:
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        corr = np.corrcoef(shap_vals, all_targets)[0, 1]
+                        if np.isnan(corr):
+                            corr = 0
+                except:
+                    corr = 0
+                    
+                sample_level_corrs[feature] = corr
 
-    # Add correlation column to main dataframe with clear naming
-    shap_signed_df["SHAP_Target_Corr_Fold"] = pd.Series(signed_corrs)
+    # Add correlation columns to main dataframe - only for regression problems
+    if problem_type != "classification":
+        shap_signed_df["Fold_Level_Correlation"] = pd.Series(fold_level_corrs)
+        shap_signed_df["Sample_Level_Correlation"] = pd.Series(sample_level_corrs)
+    
+    # Add rank columns
+    shap_signed_df["Fold_Rank"] = shap_signed_df["Fold_Level_Impact"].rank(ascending=False)
+    shap_signed_df["Sample_Rank"] = shap_signed_df["Sample_Level_Impact"].rank(ascending=False)
+    shap_signed_df["Fold_Rank_by_Magnitude"] = shap_signed_df["Fold_Impact_Magnitude"].rank(ascending=False)
+    shap_signed_df["Sample_Rank_by_Magnitude"] = shap_signed_df["Sample_Impact_Magnitude"].rank(ascending=False)
+
+    # Add correlation ranks only for regression problems
+    if problem_type != "classification" and "Fold_Level_Correlation" in shap_signed_df.columns:
+        shap_signed_df["Fold_Rank_by_Correlation"] = shap_signed_df["Fold_Level_Correlation"].rank(ascending=False, na_option='bottom')
+        shap_signed_df["Sample_Rank_by_Correlation"] = shap_signed_df["Sample_Level_Correlation"].rank(ascending=False, na_option='bottom')
 
     # -------------------------------------------------------------------------
     # Generate correlation plots for regression problems
@@ -463,12 +528,12 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         # Sample-level correlation plot
         plt.figure(figsize=(10, max(6, len(shap_signed_df) * 0.2)))
         
-        # Sort by absolute correlation value
-        corr_df = shap_signed_df.sort_values("SHAP_Target_Corr_Fold", key=abs, ascending=False).head(25)
+        # Sort by absolute correlation value (sample level)
+        corr_df = shap_signed_df.sort_values("Sample_Level_Correlation", key=abs, ascending=False).head(25)
         
         # Red for positive correlation, blue for negative
-        colors = [pos_color if x > 0 else neg_color for x in corr_df["SHAP_Target_Corr_Fold"]]
-        plt.barh(corr_df.index, corr_df["SHAP_Target_Corr_Fold"], color=colors)
+        colors = [pos_color if x > 0 else neg_color for x in corr_df["Sample_Level_Correlation"]]
+        plt.barh(corr_df.index, corr_df["Sample_Level_Correlation"], color=colors)
         plt.axvline(0, color="black", linestyle="-", linewidth=0.5)
         plt.xlabel("Correlation between SHAP values and target")
         plt.title("Features by SHAP-Target Correlation (Sample Level)")
@@ -477,28 +542,29 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
                    bbox_inches="tight")
         plt.close()
         
-        # Fold-level correlation plot - uses same data but with error bars
-        fig, ax = plt.subplots(figsize=(10, max(6, len(corr_df) * 0.2)))
+        # Fold-level correlation plot
+        corr_fold_df = shap_signed_df.sort_values("Fold_Level_Correlation", key=abs, ascending=False).head(25)
+        fig, ax = plt.subplots(figsize=(10, max(6, len(corr_fold_df) * 0.2)))
         
-        # Use the same sorting as above
-        ys = range(len(corr_df))
+        # Create the colors based on fold-level correlations
+        colors_fold = [pos_color if x > 0 else neg_color for x in corr_fold_df["Fold_Level_Correlation"]]
         
         # Draw bars
-        ax.barh(ys, corr_df["SHAP_Target_Corr_Fold"], color=colors)
-        ax.set_yticks(ys)
-        ax.set_yticklabels(corr_df.index)
+        ax.barh(range(len(corr_fold_df)), corr_fold_df["Fold_Level_Correlation"], color=colors_fold)
+        ax.set_yticks(range(len(corr_fold_df)))
+        ax.set_yticklabels(corr_fold_df.index)
         ax.axvline(0, color="black", linestyle="-", linewidth=0.5)
         ax.set_xlabel("Correlation between SHAP values and target")
         ax.set_title("Features by SHAP-Target Correlation (Fold Level)")
         
         # Add error bars for standard deviation
-        for i, (feat, row) in enumerate(corr_df.iterrows()):
-            std = row.get("Std_MeanAcrossFolds", 0)
-            ax.plot([row["SHAP_Target_Corr_Fold"] - std, row["SHAP_Target_Corr_Fold"] + std], 
+        for i, (feat, row) in enumerate(corr_fold_df.iterrows()):
+            std = row.get("Fold_SHAP_StdDev", 0)
+            ax.plot([row["Fold_Level_Correlation"] - std, row["Fold_Level_Correlation"] + std], 
                    [i, i], color="black", linewidth=1, zorder=3)
-            ax.plot([row["SHAP_Target_Corr_Fold"] - std, row["SHAP_Target_Corr_Fold"] - std], 
+            ax.plot([row["Fold_Level_Correlation"] - std, row["Fold_Level_Correlation"] - std], 
                    [i - 0.2, i + 0.2], color="black", linewidth=1, zorder=3)
-            ax.plot([row["SHAP_Target_Corr_Fold"] + std, row["SHAP_Target_Corr_Fold"] + std], 
+            ax.plot([row["Fold_Level_Correlation"] + std, row["Fold_Level_Correlation"] + std], 
                    [i - 0.2, i + 0.2], color="black", linewidth=1, zorder=3)
         
         plt.tight_layout()
@@ -514,14 +580,19 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     output_df = shap_signed_df.copy()
     
     if problem_type == "classification":
-        # Remove correlation columns for classification problems
-        corr_columns = [col for col in output_df.columns if "SHAP_Target_Corr" in col]
-        if corr_columns:
-            output_df = output_df.drop(columns=corr_columns)
+        if "Fold_Level_Correlation" in output_df.columns:
+            output_df = output_df.drop(columns=["Fold_Level_Correlation"])
+        if "Sample_Level_Correlation" in output_df.columns:
+            output_df = output_df.drop(columns=["Sample_Level_Correlation"])
+    
+    # Remove all rank columns to keep only the core metrics
+    rank_columns = [col for col in output_df.columns if 'Rank' in col]
+    if rank_columns:
+        output_df = output_df.drop(columns=rank_columns)
     
     print("Saving SHAP analysis to CSV...")
-    # Use output_df which has SHAP_Target_Corr columns removed for classification
-    output_df.to_csv(os.path.join(main_output_dir, "shap_feature_metrics.csv"), index_label="Feature")
+    # Use output_df which has columns removed as needed
+    output_df.to_csv(os.path.join(main_output_dir, "shap_features_allstats.csv"), index_label="Feature")
     
     # Save the raw SHAP value matrix for all samples with proper IDs
     # First check if we have sample IDs in the fold results
@@ -576,8 +647,10 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         
         # Add correlation ranks if not already present
         if "Rank_by_Correlation" not in shap_signed_df.columns:
-            shap_signed_df["Rank_by_Magnitude"] = shap_signed_df["Impact_Magnitude"].rank(ascending=False)
-            shap_signed_df["Rank_by_Correlation"] = shap_signed_df["SHAP_Target_Corr_Fold"].rank(ascending=False, na_option='bottom')
+            shap_signed_df["Fold_Rank_by_Magnitude"] = shap_signed_df["Fold_Impact_Magnitude"].rank(ascending=False)
+            shap_signed_df["Fold_Rank_by_Correlation"] = shap_signed_df["Fold_Level_Correlation"].rank(ascending=False, na_option='bottom')
+            shap_signed_df["Sample_Rank_by_Magnitude"] = shap_signed_df["Sample_Impact_Magnitude"].rank(ascending=False)
+            shap_signed_df["Sample_Rank_by_Correlation"] = shap_signed_df["Sample_Level_Correlation"].rank(ascending=False, na_option='bottom')
         
         # Calculate sample-level correlations (individual samples across all folds)
         # This uses all individual samples across folds directly
@@ -624,12 +697,6 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         corr_df = pd.DataFrame.from_dict(sample_level_corrs, orient='index', columns=['Correlation_With_Target'])
         corr_df.index.name = 'Feature'
         corr_df.sort_values('Correlation_With_Target', ascending=False, inplace=True)
-        
-        # Add sample-level correlation to the main dataframe
-        for feature, corr in sample_level_corrs.items():
-            if feature in shap_signed_df.index:
-                shap_signed_df.loc[feature, "SHAP_Target_Corr_Sample"] = corr
-        
         # Only save correlation CSV for regression tasks
         if problem_type == "regression":
             corr_df.to_csv(os.path.join(main_output_dir, f'shap_corr_sample.csv'))
