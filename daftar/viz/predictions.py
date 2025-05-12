@@ -14,7 +14,9 @@ from daftar.viz.color_definitions import (
     DENSITY_ACTUAL_COLOR,
     DENSITY_PREDICTED_COLOR,
     DENSITY_ALPHA,
-    CONFUSION_MATRIX_CMAP
+    CONFUSION_MATRIX_CMAP,
+    CONFUSION_MATRIX_LINEWIDTH,
+    CONFUSION_MATRIX_LINECOLOR
 )
 
 
@@ -181,7 +183,8 @@ def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matr
     colormap = cmap if cmap is not None else CONFUSION_MATRIX_CMAP
     
     ax = sns.heatmap(cm, annot=True, fmt="d", cmap=colormap, cbar=False,
-               xticklabels=classes, yticklabels=classes, annot_kws={"size": 16})
+               xticklabels=classes, yticklabels=classes, annot_kws={"size": 16},
+               linewidths=CONFUSION_MATRIX_LINEWIDTH, linecolor=CONFUSION_MATRIX_LINECOLOR)
     
     # Increase font sizes for better readability
     plt.title(title, fontsize=18, pad=20)
@@ -546,30 +549,33 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
     target = getattr(config, 'target', 'Target')
     metric = getattr(config, 'metric', 'accuracy')
     model_type = getattr(config, 'model', 'model')
-        
-    positive_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] > 0].sort_values("Fold_Mean_SHAP", ascending=False)
-    negative_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] < 0].sort_values("Fold_Mean_SHAP", ascending=True)
-    magnitude_features = feature_impact_df.sort_values("Fold_Impact_Magnitude", ascending=False)
-    
-    # Also create rankings based on sample-level and fold-level impact if available
-    has_sample_level = "Sample_Level_Impact" in feature_impact_df.columns
-    has_fold_level = "Fold_Level_Impact" in feature_impact_df.columns
-    
-    if has_sample_level:
-        sample_level_features = feature_impact_df.sort_values("Sample_Level_Impact", ascending=False)
-    
-    if has_fold_level:
-        fold_level_features = feature_impact_df.sort_values("Fold_Level_Impact", ascending=False)
+    problem_type = getattr(config, 'problem_type', 'regression')
     
     # Get configuration values
-    target = config.target
-    model_type = config.model
-    metric = config.metric
     top_n = config.top_n
     transform_x = getattr(config, 'transform_features', False)
     transform_y = getattr(config, 'transform_target', False)
     
-    # Write out a thorough summary of feature impacts
+    # Create feature data organized by different metrics - reflecting only main columns in CSV
+    sections = {
+        "Fold_Mean_SHAP": feature_impact_df.sort_values("Fold_Mean_SHAP", ascending=False),
+        "Sample_Mean_SHAP": feature_impact_df.sort_values("Sample_Mean_SHAP", ascending=False),
+        "Fold_Level_Impact": feature_impact_df.sort_values("Fold_Level_Impact", ascending=False),
+        "Sample_Level_Impact": feature_impact_df.sort_values("Sample_Level_Impact", ascending=False),
+    }
+    
+    # Add correlation sections only for regression problems
+    if problem_type == 'regression':
+        if 'Fold_Level_Correlation' in feature_impact_df.columns:
+            sections["Fold_Level_Correlation"] = feature_impact_df.sort_values("Fold_Level_Correlation", ascending=False)
+        if 'Sample_Level_Correlation' in feature_impact_df.columns:
+            sections["Sample_Level_Correlation"] = feature_impact_df.sort_values("Sample_Level_Correlation", ascending=False)
+    
+    # Also add positive/negative impact sections based on Fold_Mean_SHAP
+    positive_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] > 0].sort_values("Fold_Mean_SHAP", ascending=False)
+    negative_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] < 0].sort_values("Fold_Mean_SHAP", ascending=True)
+    
+    # Write out a concise summary of feature impacts
     with open(summary_path, 'w') as f:
         f.write("="*80 + "\n")
         f.write(f"FEATURE IMPORTANCE SUMMARY FOR {target} PREDICTION\n")
@@ -583,143 +589,72 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             f.write("Target Transformation: Log1p\n")
         f.write("\n")
         
-        # Explanation of different ranking methods
+        # Explanation of different columns
         f.write("="*80 + "\n")
-        f.write("IMPORTANT: EXPLANATION OF FEATURE RANKING METHODS\n")
+        f.write("EXPLANATION OF FEATURE METRICS\n")
         f.write("="*80 + "\n\n")
-        f.write("DAFTAR-ML uses multiple methods to rank feature importance:\n\n")
-        f.write("1. SAMPLE-LEVEL IMPACT (shown in shap_beeswarm_sample.png)\n")
-        f.write("   * Calculated directly from raw SHAP values across all samples\n")
-        f.write("   * Shows features with strongest overall impact\n")
-        f.write("   * Can highlight features important in specific contexts\n\n")
+        f.write("DAFTAR-ML provides multiple metrics for each feature:\n\n")
         
-        f.write("2. FOLD-LEVEL IMPACT (shown in shap_beeswarm_fold.png)\n")
-        f.write("   * Calculated by averaging SHAP values within each fold first\n")
-        f.write("   * Shows features that are consistently important across data splits\n")
-        f.write("   * More robust to random variation in the data\n\n")
+        f.write("Fold_Mean_SHAP: Average SHAP value across folds (positive = increases prediction, negative = decreases)\n")
+        f.write("Sample_Mean_SHAP: Average SHAP value across all samples\n")
+        f.write("Fold_Level_Impact: Average absolute SHAP impact across folds\n")
+        f.write("Sample_Level_Impact: Average absolute SHAP impact across all samples\n")
         
-        # First show sample-level rankings (beeswarm plot method)
-        if has_sample_level:
+        if problem_type == 'regression':
+            f.write("Fold_Level_Correlation: Correlation between SHAP values and target (fold-level)\n")
+            f.write("Sample_Level_Correlation: Correlation between SHAP values and target (sample-level)\n")
+            f.write("\n")
+        
+        # Generate sections for each metric
+        for metric_name, metric_df in sections.items():
             f.write("="*80 + "\n")
-            f.write(f"TOP {top_n} FEATURES BY SAMPLE-LEVEL IMPACT (Sample_Level_Impact)\n")
+            if metric_name.startswith("Fold_"):
+                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Fold-Level, Column: {metric_name})\n")
+            elif metric_name.startswith("Sample_"):
+                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Sample-Level, Column: {metric_name})\n")
+            else:
+                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Column: {metric_name})\n")
             f.write("="*80 + "\n\n")
-            f.write("These features have the strongest overall effects on individual predictions.\n")
-            f.write("This ranking matches the feature order in shap_beeswarm_sample_level.png\n\n")
             
-            for i, (feature, row) in enumerate(sample_level_features.head(top_n).iterrows(), 1):
-                direction = "Increases" if row["Fold_Mean_SHAP"] > 0 else "Decreases"
-                sample_impact = row["Sample_Level_Impact"]
-                sample_mean = row.get("Sample_Mean_SHAP", 0)
-                sample_std = row.get("Sample_SHAP_StdDev", 0)
-                fold_impact = row.get("Fold_Level_Impact", 0)
-                fold_mean = row.get("Fold_Mean_SHAP", 0)
-                fold_std = row.get("Fold_SHAP_StdDev", 0)
+            for i, (feature, row) in enumerate(metric_df.head(top_n).iterrows(), 1):
+                f.write(f"{i}. {feature}: {row[metric_name]: .6f}")
                 
-                f.write(f"{i}. {feature}\n")
-                f.write(f"   Sample-level impact (Sample_Level_Impact): {sample_impact:.6f}\n")
-                f.write(f"   Sample mean SHAP (Sample_Mean_SHAP): {sample_mean:.6f} (±{sample_std:.6f})\n")
-                f.write(f"   Fold-level impact (Fold_Level_Impact): {fold_impact:.6f}\n")
-                f.write(f"   Fold mean SHAP (Fold_Mean_SHAP): {fold_mean:.6f} (±{fold_std:.6f})\n")
-                f.write(f"   Direction (Fold_Impact_Direction): {direction} prediction\n")
-                if "Fold_Presence" in row:
-                    f.write(f"   Present in (Fold_Presence): {row['Fold_Presence']*100:.1f}% of cross-validation folds\n")
-                # Only show correlation information for regression problems
-                if config.problem_type == 'regression':
-                    if 'Sample_Level_Correlation' in row and not pd.isna(row['Sample_Level_Correlation']):
-                        f.write(f"   Sample correlation (Sample_Level_Correlation): {row['Sample_Level_Correlation']:.6f}\n")
-                    if 'Fold_Level_Correlation' in row and not pd.isna(row['Fold_Level_Correlation']):
-                        f.write(f"   Fold correlation (Fold_Level_Correlation): {row['Fold_Level_Correlation']:.6f}\n")
+                # Add standard deviation only for SHAP values (not impacts or correlations)
+                if metric_name == "Fold_Mean_SHAP" and "Fold_SHAP_StdDev" in row:
+                    f.write(f" (±{row['Fold_SHAP_StdDev']:.6f})")
+                elif metric_name == "Sample_Mean_SHAP" and "Sample_SHAP_StdDev" in row:
+                    f.write(f" (±{row['Sample_SHAP_StdDev']:.6f})")
+                
                 f.write("\n")
         
-        # Then show fold-level rankings
-        if has_fold_level:
-            f.write("="*80 + "\n")
-            f.write(f"TOP {top_n} FEATURES BY FOLD-LEVEL IMPACT (Fold_Level_Impact)\n")
-            f.write("="*80 + "\n\n")
-            f.write("These features have the strongest and most consistent effects across cross-validation folds.\n")
-            f.write("This ranking matches the feature order in shap_beeswarm_fold_level.png\n\n")
-            
-            for i, (feature, row) in enumerate(fold_level_features.head(top_n).iterrows(), 1):
-                direction = "Increases" if row["Fold_Mean_SHAP"] > 0 else "Decreases"
-                sample_impact = row.get("Sample_Level_Impact", 0)
-                sample_mean = row.get("Sample_Mean_SHAP", 0)
-                sample_std = row.get("Sample_SHAP_StdDev", 0)
-                fold_impact = row.get("Fold_Level_Impact", 0)
-                fold_mean = row.get("Fold_Mean_SHAP", 0)
-                fold_std = row.get("Fold_SHAP_StdDev", 0)
-                
-                f.write(f"{i}. {feature}\n")
-                f.write(f"   Fold-level impact (Fold_Level_Impact): {fold_impact:.6f}\n")
-                f.write(f"   Fold mean SHAP (Fold_Mean_SHAP): {fold_mean:.6f} (±{fold_std:.6f})\n")
-                f.write(f"   Sample-level impact (Sample_Level_Impact): {sample_impact:.6f}\n")
-                f.write(f"   Sample mean SHAP (Sample_Mean_SHAP): {sample_mean:.6f} (±{sample_std:.6f})\n")
-                f.write(f"   Direction (Fold_Impact_Direction): {direction} prediction\n")
-                if "Fold_Presence" in row:
-                    f.write(f"   Present in (Fold_Presence): {row['Fold_Presence']*100:.1f}% of cross-validation folds\n")
-                # Only show correlation information for regression problems
-                if config.problem_type == 'regression':
-                    if 'Fold_Level_Correlation' in row and not pd.isna(row['Fold_Level_Correlation']):
-                        f.write(f"   Fold correlation (Fold_Level_Correlation): {row['Fold_Level_Correlation']:.6f}\n")
-                    if 'Sample_Level_Correlation' in row and not pd.isna(row['Sample_Level_Correlation']):
-                        f.write(f"   Sample correlation (Sample_Level_Correlation): {row['Sample_Level_Correlation']:.6f}\n")
-                f.write("\n")
+            # Add extra space after the last item in the list
+            f.write("\n")
         
-        # Traditional feature importance section removed as requested
-        
+        # Special sections for positive and negative impacts
         f.write("="*80 + "\n")
-        f.write(f"TOP {top_n} FEATURES WITH POSITIVE IMPACT (Fold_Mean_SHAP > 0)\n")
+        f.write(f"TOP {top_n} FEATURES WITH POSITIVE IMPACT (Fold-Level, Column: Fold_Mean_SHAP > 0)\n")
         f.write("="*80 + "\n\n")
-        f.write("These features tend to increase the predicted value when their values increase.\n\n")
         
         for i, (feature, row) in enumerate(positive_features.head(top_n).iterrows(), 1):
-            magnitude = row["Fold_Mean_SHAP"]
-            std = row["Fold_SHAP_StdDev"]
-            sample_impact = row.get("Sample_Level_Impact", 0)
-            sample_mean = row.get("Sample_Mean_SHAP", 0)
-            sample_std = row.get("Sample_SHAP_StdDev", 0)
-            fold_impact = row.get("Fold_Level_Impact", 0)
-            
-            f.write(f"{i}. {feature}\n")
-            f.write(f"   Increases prediction by (Fold_Mean_SHAP): {magnitude:.6f} (±{std:.6f})\n")
-            f.write(f"   Fold-level impact (Fold_Level_Impact): {fold_impact:.6f}\n")
-            f.write(f"   Sample-level impact (Sample_Level_Impact): {sample_impact:.6f}\n")
-            f.write(f"   Sample mean SHAP (Sample_Mean_SHAP): {sample_mean:.6f} (±{sample_std:.6f})\n")
-            if "Fold_Presence" in row:
-                f.write(f"   Present in (Fold_Presence): {row['Fold_Presence']*100:.1f}% of cross-validation folds\n")
-            # Only show correlation information for regression problems and if correlation data exists
-            if config.problem_type == 'regression':
-                if 'Fold_Level_Correlation' in row and not pd.isna(row['Fold_Level_Correlation']):
-                    f.write(f"   Fold correlation (Fold_Level_Correlation): {row['Fold_Level_Correlation']:.6f}\n")
-                if 'Sample_Level_Correlation' in row and not pd.isna(row['Sample_Level_Correlation']):
-                    f.write(f"   Sample correlation (Sample_Level_Correlation): {row['Sample_Level_Correlation']:.6f}\n")
+            f.write(f"{i}. {feature}: {row['Fold_Mean_SHAP']:.6f}")
+            if "Fold_SHAP_StdDev" in row:
+                f.write(f" (±{row['Fold_SHAP_StdDev']:.6f})")
+            f.write("\n")
+        
+        # Add extra space after the list
             f.write("\n")
         
         f.write("="*80 + "\n")
-        f.write(f"TOP {top_n} FEATURES WITH NEGATIVE IMPACT (Fold_Mean_SHAP < 0)\n")
+        f.write(f"TOP {top_n} FEATURES WITH NEGATIVE IMPACT (Fold-Level, Column: Fold_Mean_SHAP < 0)\n")
         f.write("="*80 + "\n\n")
-        f.write("These features tend to decrease the predicted value when their values increase.\n\n")
         
         for i, (feature, row) in enumerate(negative_features.head(top_n).iterrows(), 1):
-            magnitude = abs(row["Fold_Mean_SHAP"])
-            std = row["Fold_SHAP_StdDev"]
-            sample_impact = row.get("Sample_Level_Impact", 0)
-            sample_mean = row.get("Sample_Mean_SHAP", 0)
-            sample_std = row.get("Sample_SHAP_StdDev", 0)
-            fold_impact = row.get("Fold_Level_Impact", 0)
-            
-            f.write(f"{i}. {feature}\n")
-            f.write(f"   Decreases prediction by (Fold_Mean_SHAP): {magnitude:.6f} (±{std:.6f})\n")
-            f.write(f"   Fold-level impact (Fold_Level_Impact): {fold_impact:.6f}\n")
-            f.write(f"   Sample-level impact (Sample_Level_Impact): {sample_impact:.6f}\n")
-            f.write(f"   Sample mean SHAP (Sample_Mean_SHAP): {sample_mean:.6f} (±{sample_std:.6f})\n")
-            if "Fold_Presence" in row:
-                f.write(f"   Present in (Fold_Presence): {row['Fold_Presence']*100:.1f}% of cross-validation folds\n")
-            # Only show correlation information for regression problems and if correlation data exists
-            if config.problem_type == 'regression':
-                if 'Fold_Level_Correlation' in row and not pd.isna(row['Fold_Level_Correlation']):
-                    f.write(f"   Fold correlation (Fold_Level_Correlation): {row['Fold_Level_Correlation']:.6f}\n")
-                if 'Sample_Level_Correlation' in row and not pd.isna(row['Sample_Level_Correlation']):
-                    f.write(f"   Sample correlation (Sample_Level_Correlation): {row['Sample_Level_Correlation']:.6f}\n")
+            f.write(f"{i}. {feature}: {abs(row['Fold_Mean_SHAP']):.6f}")
+            if "Fold_SHAP_StdDev" in row:
+                f.write(f" (±{row['Fold_SHAP_StdDev']:.6f})")
+            f.write("\n")
+        
+        # Add extra space after the list
             f.write("\n")
         
         f.write("="*80 + "\n")

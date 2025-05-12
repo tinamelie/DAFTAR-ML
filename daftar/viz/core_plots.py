@@ -10,7 +10,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
 
-from daftar.viz.color_definitions import CONFUSION_MATRIX_CMAP, REGRESSION_MEAN_LINE_COLOR
+from daftar.viz.color_definitions import (
+    CONFUSION_MATRIX_CMAP, REGRESSION_MEAN_LINE_COLOR, 
+    CONFUSION_MATRIX_LINEWIDTH, CONFUSION_MATRIX_LINECOLOR
+)
 
 
 def create_shap_summary(shap_values: List[np.ndarray], 
@@ -131,7 +134,8 @@ def create_prediction_analysis(y_true: List,
         
         # Plot confusion matrix
         sns.heatmap(cm, annot=True, fmt="d", cmap=CONFUSION_MATRIX_CMAP, cbar=False,
-                   xticklabels=classes, yticklabels=classes, ax=ax)
+                   xticklabels=classes, yticklabels=classes, ax=ax,
+                   linewidths=CONFUSION_MATRIX_LINEWIDTH, linecolor=CONFUSION_MATRIX_LINECOLOR)
         ax.set_xlabel('Predicted')
         ax.set_ylabel('True')
         ax.set_title('Confusion Matrix - Overall Performance')

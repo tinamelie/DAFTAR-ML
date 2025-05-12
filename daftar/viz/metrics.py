@@ -20,7 +20,9 @@ from daftar.viz.color_definitions import (
     CONFUSION_MATRIX_CMAP,
     REGRESSION_MEAN_LINE_COLOR,
     DENSITY_ACTUAL_COLOR,
-    DENSITY_PREDICTED_COLOR
+    DENSITY_PREDICTED_COLOR,
+    CONFUSION_MATRIX_LINEWIDTH,
+    CONFUSION_MATRIX_LINECOLOR
 )
 
 
@@ -190,7 +192,8 @@ def plot_confusion_matrix(
     # Plot confusion matrix
     sns.heatmap(
         cm, annot=True, fmt=fmt, cmap=CONFUSION_MATRIX_CMAP,
-        xticklabels=class_names, yticklabels=class_names
+        xticklabels=class_names, yticklabels=class_names,
+        linewidths=CONFUSION_MATRIX_LINEWIDTH, linecolor=CONFUSION_MATRIX_LINECOLOR
     )
     
     plt.ylabel('True Label')

@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Tuple, Optional
 
 from daftar.viz.common import set_plot_style, save_plot, create_subplots
 from sklearn.metrics import confusion_matrix, roc_curve, auc
-from daftar.viz.color_definitions import CONFUSION_MATRIX_CMAP
+from daftar.viz.color_definitions import CONFUSION_MATRIX_CMAP, CONFUSION_MATRIX_LINEWIDTH, CONFUSION_MATRIX_LINECOLOR
 
 
 def generate_confusion_matrix(true_values, predictions, output_path, title="Confusion Matrix", metric=None):
@@ -34,7 +34,8 @@ def generate_confusion_matrix(true_values, predictions, output_path, title="Conf
     
     # Plot the confusion matrix
     sns.heatmap(cm, annot=True, fmt="d", cmap=CONFUSION_MATRIX_CMAP, cbar=False,
-                xticklabels=classes, yticklabels=classes, annot_kws={"size": 16}, ax=ax)
+                xticklabels=classes, yticklabels=classes, annot_kws={"size": 16}, ax=ax,
+                linewidths=CONFUSION_MATRIX_LINEWIDTH, linecolor=CONFUSION_MATRIX_LINECOLOR)
     
     # Increase font sizes for better readability
     plt.title(title, fontsize=18, pad=20)
