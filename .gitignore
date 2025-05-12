@@ -1,4 +1,4 @@
-# Python cache files
+# Python bytecode
 __pycache__/
 *.py[cod]
 *$py.class
@@ -8,14 +8,27 @@ dist/
 build/
 *.egg-info/
 
-# Local development settings
-.venv/
-.env
+# Virtual environments
+clean-env/
+env/
+venv/
+ENV/
+
+# macOS specific files
+.DS_Store
+
+# Generated files
+color_palette.png
+
+# Jupyter notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# IDE files
 .idea/
 .vscode/
-
-# Jupyter Notebook
-.ipynb_checkpoints
+*.swp
+*.swo
 
 # Test directories and outputs
 test_cv_comp/
