@@ -547,9 +547,9 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
     metric = getattr(config, 'metric', 'accuracy')
     model_type = getattr(config, 'model', 'model')
         
-    positive_features = feature_impact_df[feature_impact_df["Mean_Signed"] > 0].sort_values("Mean_Signed", ascending=False)
-    negative_features = feature_impact_df[feature_impact_df["Mean_Signed"] < 0].sort_values("Mean_Signed", ascending=True)
-    magnitude_features = feature_impact_df.sort_values("Impact_Magnitude", ascending=False)
+    positive_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] > 0].sort_values("Fold_Mean_SHAP", ascending=False)
+    negative_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] < 0].sort_values("Fold_Mean_SHAP", ascending=True)
+    magnitude_features = feature_impact_df.sort_values("Fold_Impact_Magnitude", ascending=False)
     
     # Also create rankings based on sample-level and fold-level impact if available
     has_sample_level = "Sample_Level_Impact" in feature_impact_df.columns
@@ -607,7 +607,7 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             f.write("This ranking matches the feature order in shap_beeswarm_sample_level.png\n\n")
             
             for i, (feature, row) in enumerate(sample_level_features.head(top_n).iterrows(), 1):
-                direction = "Increases" if row["Mean_Signed"] > 0 else "Decreases"
+                direction = "Increases" if row["Fold_Mean_SHAP"] > 0 else "Decreases"
                 sample_impact = row["Sample_Level_Impact"]
                 f.write(f"{i}. {feature}\n")
                 f.write(f"   Sample-level impact: {sample_impact:.6f}\n")
@@ -625,7 +625,7 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
             f.write("This ranking matches the feature order in shap_beeswarm_fold_level.png\n\n")
             
             for i, (feature, row) in enumerate(fold_level_features.head(top_n).iterrows(), 1):
-                direction = "Increases" if row["Mean_Signed"] > 0 else "Decreases"
+                direction = "Increases" if row["Fold_Mean_SHAP"] > 0 else "Decreases"
                 fold_impact = row["Fold_Level_Impact"]
                 f.write(f"{i}. {feature}\n")
                 f.write(f"   Fold-level impact: {fold_impact:.6f}\n")
@@ -642,13 +642,13 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
         f.write("These features tend to increase the predicted value when their values increase.\n\n")
         
         for i, (feature, row) in enumerate(positive_features.head(top_n).iterrows(), 1):
-            magnitude = row["Mean_Signed"]
-            std = row["Std_MeanAcrossFolds"]
+            magnitude = row["Fold_Mean_SHAP"]
+            std = row["Fold_SHAP_StdDev"]
             f.write(f"{i}. {feature}\n")
             f.write(f"   Increases prediction by {magnitude:.6f} (±{std:.6f})\n")
             # Only show correlation information for regression problems
-            if config.problem_type == 'regression' and 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
-                f.write(f"   Correlation with target: {row['Target_Correlation']:.6f}\n")
+            if config.problem_type == 'regression' and 'Fold_Level_Correlation' in row and not pd.isna(row['Fold_Level_Correlation']):
+                f.write(f"   Correlation with target: {row['Fold_Level_Correlation']:.6f}\n")
             f.write("\n")
         
         f.write("="*80 + "\n")
@@ -657,13 +657,13 @@ def save_top_features_summary(feature_impact_df, main_output_dir, config):
         f.write("These features tend to decrease the predicted value when their values increase.\n\n")
         
         for i, (feature, row) in enumerate(negative_features.head(top_n).iterrows(), 1):
-            magnitude = abs(row["Mean_Signed"])
-            std = row["Std_MeanAcrossFolds"]
+            magnitude = abs(row["Fold_Mean_SHAP"])
+            std = row["Fold_SHAP_StdDev"]
             f.write(f"{i}. {feature}\n")
             f.write(f"   Decreases prediction by {magnitude:.6f} (±{std:.6f})\n")
             # Only show correlation information for regression problems
-            if config.problem_type == 'regression' and 'Target_Correlation' in row and not pd.isna(row['Target_Correlation']):
-                f.write(f"   Correlation with target: {row['Target_Correlation']:.6f}\n")
+            if config.problem_type == 'regression' and 'Fold_Level_Correlation' in row and not pd.isna(row['Fold_Level_Correlation']):
+                f.write(f"   Correlation with target: {row['Fold_Level_Correlation']:.6f}\n")
             f.write("\n")
         
         f.write("="*80 + "\n")

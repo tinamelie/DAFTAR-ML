@@ -451,8 +451,8 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
                     fold_corrs.append(corr)
             signed_corrs[feature] = np.mean(fold_corrs) if fold_corrs else 0
 
-    # Add correlation column to main dataframe
-    shap_signed_df["Target_Correlation"] = pd.Series(signed_corrs)
+    # Add correlation column to main dataframe with clear naming
+    shap_signed_df["SHAP_Target_Corr_Fold"] = pd.Series(signed_corrs)
 
     # -------------------------------------------------------------------------
     # Generate correlation plots for regression problems
@@ -464,11 +464,11 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         plt.figure(figsize=(10, max(6, len(shap_signed_df) * 0.2)))
         
         # Sort by absolute correlation value
-        corr_df = shap_signed_df.sort_values("Target_Correlation", key=abs, ascending=False).head(25)
+        corr_df = shap_signed_df.sort_values("SHAP_Target_Corr_Fold", key=abs, ascending=False).head(25)
         
         # Red for positive correlation, blue for negative
-        colors = [pos_color if x > 0 else neg_color for x in corr_df["Target_Correlation"]]
-        plt.barh(corr_df.index, corr_df["Target_Correlation"], color=colors)
+        colors = [pos_color if x > 0 else neg_color for x in corr_df["SHAP_Target_Corr_Fold"]]
+        plt.barh(corr_df.index, corr_df["SHAP_Target_Corr_Fold"], color=colors)
         plt.axvline(0, color="black", linestyle="-", linewidth=0.5)
         plt.xlabel("Correlation between SHAP values and target")
         plt.title("Features by SHAP-Target Correlation (Sample Level)")
@@ -484,7 +484,7 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         ys = range(len(corr_df))
         
         # Draw bars
-        ax.barh(ys, corr_df["Target_Correlation"], color=colors)
+        ax.barh(ys, corr_df["SHAP_Target_Corr_Fold"], color=colors)
         ax.set_yticks(ys)
         ax.set_yticklabels(corr_df.index)
         ax.axvline(0, color="black", linestyle="-", linewidth=0.5)
@@ -494,11 +494,11 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         # Add error bars for standard deviation
         for i, (feat, row) in enumerate(corr_df.iterrows()):
             std = row.get("Std_MeanAcrossFolds", 0)
-            ax.plot([row["Target_Correlation"] - std, row["Target_Correlation"] + std], 
+            ax.plot([row["SHAP_Target_Corr_Fold"] - std, row["SHAP_Target_Corr_Fold"] + std], 
                    [i, i], color="black", linewidth=1, zorder=3)
-            ax.plot([row["Target_Correlation"] - std, row["Target_Correlation"] - std], 
+            ax.plot([row["SHAP_Target_Corr_Fold"] - std, row["SHAP_Target_Corr_Fold"] - std], 
                    [i - 0.2, i + 0.2], color="black", linewidth=1, zorder=3)
-            ax.plot([row["Target_Correlation"] + std, row["Target_Correlation"] + std], 
+            ax.plot([row["SHAP_Target_Corr_Fold"] + std, row["SHAP_Target_Corr_Fold"] + std], 
                    [i - 0.2, i + 0.2], color="black", linewidth=1, zorder=3)
         
         plt.tight_layout()
@@ -510,15 +510,17 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # -------------------------------------------------------------------------
     # Save detailed CSV
     # -------------------------------------------------------------------------
-    # For classification problems, remove the Target_Correlation column
+    # For classification problems, remove the correlation columns
     output_df = shap_signed_df.copy()
     
     if problem_type == "classification":
-        if "Target_Correlation" in output_df.columns:
-            output_df = output_df.drop(columns=["Target_Correlation"])
+        # Remove correlation columns for classification problems
+        corr_columns = [col for col in output_df.columns if "SHAP_Target_Corr" in col]
+        if corr_columns:
+            output_df = output_df.drop(columns=corr_columns)
     
     print("Saving SHAP analysis to CSV...")
-    # Use output_df which has Target_Correlation removed for classification
+    # Use output_df which has SHAP_Target_Corr columns removed for classification
     output_df.to_csv(os.path.join(main_output_dir, "shap_feature_metrics.csv"), index_label="Feature")
     
     # Save the raw SHAP value matrix for all samples with proper IDs
@@ -575,7 +577,7 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         # Add correlation ranks if not already present
         if "Rank_by_Correlation" not in shap_signed_df.columns:
             shap_signed_df["Rank_by_Magnitude"] = shap_signed_df["Impact_Magnitude"].rank(ascending=False)
-            shap_signed_df["Rank_by_Correlation"] = shap_signed_df["Target_Correlation"].rank(ascending=False, na_option='bottom')
+            shap_signed_df["Rank_by_Correlation"] = shap_signed_df["SHAP_Target_Corr_Fold"].rank(ascending=False, na_option='bottom')
         
         # Calculate sample-level correlations (individual samples across all folds)
         # This uses all individual samples across folds directly
@@ -622,6 +624,12 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         corr_df = pd.DataFrame.from_dict(sample_level_corrs, orient='index', columns=['Correlation_With_Target'])
         corr_df.index.name = 'Feature'
         corr_df.sort_values('Correlation_With_Target', ascending=False, inplace=True)
+        
+        # Add sample-level correlation to the main dataframe
+        for feature, corr in sample_level_corrs.items():
+            if feature in shap_signed_df.index:
+                shap_signed_df.loc[feature, "SHAP_Target_Corr_Sample"] = corr
+        
         # Only save correlation CSV for regression tasks
         if problem_type == "regression":
             corr_df.to_csv(os.path.join(main_output_dir, f'shap_corr_sample.csv'))
