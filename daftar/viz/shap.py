@@ -300,7 +300,7 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # Set labels and grid
     ax.set_xlabel("SHAP Impact (Sample-Level)")
     ax.set_ylabel("Feature")
-    ax.set_title(f"Top 25 Features by Sample-Level Impact")
+    ax.set_title(f"Sample-Level SHAP Impact (Top {top_n})")
     ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
     ax.grid(axis="y", visible=False)
 
@@ -395,7 +395,7 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # Set labels and grid
     ax.set_xlabel("SHAP Impact (Fold-Level)")
     ax.set_ylabel("Feature")
-    ax.set_title(f"Top 25 Features by Fold-Level Impact (with cross-fold variation)")
+    ax.set_title(f"Fold-Level SHAP Impact (Top {top_n})")
     ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
     ax.grid(axis="y", visible=False)
 
