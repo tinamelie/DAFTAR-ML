@@ -41,8 +41,13 @@ from daftar.viz.optuna import save_optuna_visualizations
 from daftar.viz.shap import save_mean_shap_analysis
 from daftar.viz.feature_importance import plot_feature_importance_bar, save_feature_importance_values
 from daftar.viz.predictions import generate_density_plots, save_fold_predictions_vs_actual, save_top_features_summary
-from daftar.viz.color_definitions import FEATURE_IMPORTANCE_BAR_COLOR, FEATURE_IMPORTANCE_BAR_BG
-from daftar.viz.color_definitions import get_train_test_colors
+from daftar.viz.color_definitions import (
+    FEATURE_IMPORTANCE_BAR_COLOR, 
+    FEATURE_IMPORTANCE_BAR_BG,
+    HISTOGRAM_BG_COLOR,
+    CLASSIFICATION_BAR_BG_COLOR,
+    get_train_test_colors
+)
 
 
 class Pipeline:
@@ -334,7 +339,7 @@ class Pipeline:
         
         # Get feature importances
         if hasattr(model, 'feature_importances_'):
-            feature_importances = model.feature_importances_
+        feature_importances = model.feature_importances_
         else:
             # Some models might not have this attribute, provide zeros as fallback
             feature_importances = np.zeros(len(feature_names))
@@ -346,7 +351,7 @@ class Pipeline:
             try:
                 # Create DataFrame for SHAP values calculation (for better visualization)
                 X_test_df = pd.DataFrame(X_test, columns=feature_names)
-                shap_values = model.shap_values(X_test)
+        shap_values = model.shap_values(X_test)
             except Exception as e:
                 self.logger.warning(f"Could not calculate SHAP values for fold {fold_idx}: {e}")
                 X_test_df = None
@@ -447,6 +452,9 @@ class Pipeline:
             
             plt.xlabel("Class")
             plt.ylabel("Count")
+            
+            # Set background color
+            ax.set_facecolor(CLASSIFICATION_BAR_BG_COLOR)
         else:
             # For regression, calculate optimal bins based on combined data
             combined_data = pd.concat([train_series, test_series])
@@ -468,6 +476,9 @@ class Pipeline:
             plt.xlabel("Target Value")
             plt.ylabel("Frequency")
             plt.legend()
+            
+            # Set background color for regression histogram
+            plt.gca().set_facecolor(HISTOGRAM_BG_COLOR)
         
         plt.title(f"Fold {fold_idx} - Train/Test Distribution")
         plt.tight_layout()
@@ -586,34 +597,22 @@ class Pipeline:
         # Feature importance
         self.logger.info("Saving feature importance values...")
         # Save per-fold feature importance values in their respective fold directories
-        # Creates both fold-level and sample-level versions in feature_importance dir
-        fold_level_df, sample_level_df = save_feature_importance_values(results['fold_results'], output_dir, in_fold_dirs=True)
+        feature_importance_df = save_feature_importance_values(results['fold_results'], output_dir, in_fold_dirs=True)
         
         # Track output files
         feature_importance_dir = output_dir / "feature_importance"
-        output_files['feature_importance_values_fold'] = str(feature_importance_dir / 'feature_importance_values_fold.csv')
-        output_files['feature_importance_values_sample'] = str(feature_importance_dir / 'feature_importance_values_sample.csv')
-        output_files['feature_importance_values'] = str(output_dir / 'feature_importance_overall.csv')  # Legacy path
+        output_files['feature_importance_values'] = str(feature_importance_dir / 'feature_importance_values.csv')
         
         # Save per-fold and concatenated SHAP values as CSV files
         save_shap_values(results['fold_results'], output_dir)
         
-        # Create fold-level feature importance bar plot
-        self.logger.info("Creating fold-level feature importance bar plot...")
-        plot_feature_importance_bar(fold_level_df, output_dir, self.config.top_n, 
-                                   bar_color=FEATURE_IMPORTANCE_BAR_COLOR, bar_opacity=1.0, bg_color=FEATURE_IMPORTANCE_BAR_BG, 
-                                   plot_type="fold")
+        # Create feature importance bar plot
+        self.logger.info("Creating feature importance bar plot...")
+        plot_feature_importance_bar(feature_importance_df, output_dir, self.config.top_n, 
+                                   bar_color=FEATURE_IMPORTANCE_BAR_COLOR, bar_opacity=1.0, bg_color=FEATURE_IMPORTANCE_BAR_BG)
         
-        # Create sample-level feature importance bar plot
-        self.logger.info("Creating sample-level feature importance bar plot...")
-        plot_feature_importance_bar(sample_level_df, output_dir, self.config.top_n, 
-                                   bar_color=FEATURE_IMPORTANCE_BAR_COLOR, bar_opacity=1.0, bg_color=FEATURE_IMPORTANCE_BAR_BG, 
-                                   plot_type="sample")
-        
-        # Track all feature importance bar plots
-        output_files['feature_importance_bar'] = str(output_dir / 'feature_importance_bar.png')  # Legacy path
-        output_files['feature_importance_bar_fold'] = str(feature_importance_dir / 'feature_importance_bar_fold.png')
-        output_files['feature_importance_bar_sample'] = str(feature_importance_dir / 'feature_importance_bar_sample.png')
+        # Track feature importance bar plot
+        output_files['feature_importance_bar'] = str(feature_importance_dir / 'feature_importance_bar.png')
         
         # Generate predictions vs actual and density plots (density only for regression)
         if self.config.problem_type == "regression":
@@ -653,5 +652,5 @@ class Pipeline:
             'metrics': overall_metrics,
             'output_files': output_files,
             'shap_analysis': shap_df.to_dict() if shap_df is not None else {},
-            'feature_importance': fold_level_df.to_dict() if 'fold_level_df' in locals() and fold_level_df is not None else {}
+            'feature_importance': feature_importance_df.to_dict() if 'feature_importance_df' in locals() and feature_importance_df is not None else {}
         }

@@ -82,7 +82,7 @@ def create_figures_explanation(output_dir: Path) -> None:
         "7. DATA FILES",
         "-" * 80,
         "SHAP Analysis Files:",
-        "- shap_features_allstats.csv: Complete feature metrics with all the statistics used in plots.",
+        "- shap_features_analysis.csv: Complete feature metrics with all the statistics used in plots.",
         "- shap_values_all_folds.csv: Combined SHAP values from all folds.",
         "- shap_values_fold_X.csv: Fold-specific SHAP values.",
         "",
@@ -98,6 +98,8 @@ def create_figures_explanation(output_dir: Path) -> None:
         "- best_model_fold_X.pkl: Trained fold-specific models.",
         "- performance.txt: Summary metrics across folds.",
         "- DAFTAR-ML_run.log: Comprehensive analysis logs.",
+        "Fold_Impact_Direction: Direction of impact (Positive or Negative)\n",
+        "Sample_Mean_SHAP: Average SHAP value across all samples\n",
     ]
 
     with open(output_dir / "figures_explanation.txt", "w") as f:

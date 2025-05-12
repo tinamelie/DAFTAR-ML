@@ -7,8 +7,6 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 
-from daftar.viz.color_definitions import PLOT_CYCLE_COLORS
-
 # Set common styling for all plots
 def set_plot_style():
     """Set common styling for all visualizations."""
@@ -23,8 +21,7 @@ def set_plot_style():
     plt.rcParams['legend.fontsize'] = 12
     # Higher DPI for clearer plots
     plt.rcParams['figure.dpi'] = 150
-    # Modern color palette
-    plt.rcParams['axes.prop_cycle'] = plt.cycler(color=PLOT_CYCLE_COLORS)
+    # Modern color palette - using default matplotlib colors instead of custom
     # Transparent background for better embedding
     plt.rcParams['figure.facecolor'] = 'white'
     plt.rcParams['axes.facecolor'] = 'white'

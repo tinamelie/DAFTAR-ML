@@ -19,7 +19,13 @@ import seaborn as sns
 from scipy import stats
 from sklearn.model_selection import KFold, RepeatedKFold, StratifiedKFold, RepeatedStratifiedKFold
 
-from daftar.viz.color_definitions import get_color_palette, get_train_test_colors
+from daftar.viz.color_definitions import (
+    get_color_palette,
+    get_train_test_colors,
+    HISTOGRAM_BG_COLOR,
+    CLASSIFICATION_BAR_BG_COLOR,
+    REGRESSION_HIST_ALPHA
+)
 
 
 # Visualization helpers
@@ -354,6 +360,9 @@ def plot_hist_or_bar(
             
         if patches:  # Only create legend if we have classes
             ax.legend(patches, labels)
+        
+        # Set background color for classification charts
+        ax.set_facecolor(CLASSIFICATION_BAR_BG_COLOR)
     else:
         # Calculate optimal bins if not specified
         if bins is None:
@@ -363,7 +372,7 @@ def plot_hist_or_bar(
         hist_color = get_color_palette(is_classification=False)
         
         # Create histogram with computed bins
-        sns.histplot(series, kde=False, bins=bins, color=hist_color, alpha=0.8, ax=ax)
+        sns.histplot(series, kde=False, bins=bins, color=hist_color, alpha=REGRESSION_HIST_ALPHA, ax=ax)
         ax.set_xlabel("Target Value")
         ax.set_ylabel("Frequency")
         mean = series.mean()
@@ -411,6 +420,9 @@ def plot_fold_comparison(
         # Remove "Set" header from legend
         handles, _ = ax.get_legend_handles_labels()
         ax.legend(handles, ["Train", "Test"])
+        
+        # Set background color for classification charts
+        ax.set_facecolor(CLASSIFICATION_BAR_BG_COLOR)
     else:
         # Calculate optimal bins based on combined data
         data_combined = pd.concat([train_series, test_series])
@@ -421,6 +433,9 @@ def plot_fold_comparison(
         ax.hist(test_series, alpha=0.8, color=train_test_colors["Test"], bins=bins, label="Test")
         ax.set_xlabel("Target Value")
         ax.legend()
+        
+        # Set background color for regression charts
+        ax.set_facecolor(HISTOGRAM_BG_COLOR)
     
     # Create title with p-value if provided
     if p_value is not None:

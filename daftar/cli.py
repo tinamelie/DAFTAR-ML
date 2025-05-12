@@ -54,7 +54,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     """
     parser = argparse.ArgumentParser(description="DAFTAR-ML: Feature Importance via Repeated Annotation of Trees", 
         formatter_class=CustomHelpFormatter,
-        usage="daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task {regression,classification}] [--metric NAME] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
+        usage="daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task {regression,classification}] [--metric {mse,rmse,mae,r2,accuracy,f1,roc_auc}] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
     )
     
     # Customize help message to capitalize 'Show'
@@ -158,8 +158,8 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     optional_args.add_argument(
         "--metric",
         type=str,
-        metavar="NAME",
-        help="Metric to optimize (regression: mse/rmse/mae/r2, classification: accuracy/f1/roc_auc)"
+        choices=["mse", "rmse", "mae", "r2", "accuracy", "f1", "roc_auc"],
+        help="Metric to optimize (regression: {mse|rmse|mae|r2}, classification: {accuracy|f1|roc_auc})"
     )
         
     # Optimization arguments
@@ -187,7 +187,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     viz_args.add_argument(
         "--top_n",
         type=int,
-        default=25,
+        default=15,
         metavar="INTEGER",
         help="Number of top features to include in visualizations"
     )
@@ -462,7 +462,7 @@ def main(args: Optional[List[str]] = None) -> int:
         cmd += f" --patience {config.patience}"
     if hasattr(config, 'relative_threshold') and config.relative_threshold != 1e-6:
         cmd += f" --threshold {config.relative_threshold}"
-    if hasattr(config, 'top_n') and config.top_n != 25:
+    if hasattr(config, 'top_n') and config.top_n != 15:
         cmd += f" --top_n {config.top_n}"
     if hasattr(config, 'seed') and config.seed != 42:
         cmd += f" --seed {config.seed}"

@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List, Literal, Union
 # Default values
 DEFAULT_PATIENCE = 50  # Higher default for more thorough optimization
 DEFAULT_RELATIVE_THRESHOLD = 1e-6
-DEFAULT_TOP_N = 25
+DEFAULT_TOP_N = 15
 
 # Metric-specific default relative thresholds
 METRIC_DEFAULT_RELATIVE_THRESHOLDS = {
