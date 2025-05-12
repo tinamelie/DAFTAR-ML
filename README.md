@@ -42,7 +42,7 @@ DAFTAR‑ML expects a comma‑separated file (csv) with:
 | Species2 |      **0**      |       8       |       1       |       6       |
 | Species3 |     **0.01**    |       0       |       4       |       3       |
 
-In this gene-phenotype example, we use gene clusters OrthoFinder as our **features**. The **target** column, Xylose_growth, is growth rates of species on xylose medium. The aim is to identify which gene clusters (**features**) are important to this **target**, i.e. which gene clusters are relevant to growth on xylose. 
+In this gene-phenotype example, OrthoFinder are  our **features**. The **target** column, Xylose_growth, is the growth rate of species on xylose medium. The aim is to identify which gene clusters (**features**) are important to this **target**, i.e. which gene clusters are relevant to growth on xylose. 
 ### Results example (summary):
 | Rank |    Feature    |  SHAP Score |
 |------|:-------------:|:------:|
