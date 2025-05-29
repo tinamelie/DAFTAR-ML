@@ -1,0 +1,32 @@
+# DAFTAR-ML example configuration file
+# Place this file in your project directory and reference it with --config
+
+# Required parameters
+input_file: "/path/to/your/data.csv"
+target: "TargetColumn"  # Name of the column to predict
+problem_type: "regression"  # Options: regression, classification
+model: "xgb"  # Options: xgb, rf
+id_column: "ID"  # Column with sample IDs
+
+# Optional parameters
+metric: "rmse"  # For regression: mse, rmse, mae, r2; For classification: accuracy, f1, roc_auc
+
+# Cross-validation parameters
+inner_folds: 3
+outer_folds: 5
+repeats: 5
+
+# Optimization parameters
+patience: 50  # Early stopping after this many trials without improvement
+threshold: 1e-4  # Minimum relative improvement threshold
+
+# Visualization parameters
+top_n: 15  # Number of top features to include in visualizations
+
+# Execution parameters
+cores: -1  # Number of CPU cores (-1 for all available)
+seed: 42  # Random seed for reproducibility
+force_overwrite: false  # Whether to overwrite existing output without asking
+
+# Output parameters
+output_dir: "custom_result_dir"  # Custom output directory name

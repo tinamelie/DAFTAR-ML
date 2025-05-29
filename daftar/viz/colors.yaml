@@ -1,0 +1,89 @@
+# DAFTAR-ML Visualization Color Configuration
+# 
+# This file defines all colors used across DAFTAR-ML visualizations.
+# Edit this file to customize the appearance of your visualizations.
+
+# Classification colors
+classification:
+  # Binary classification colors (alternating)
+  binary:
+    class0: "#225ea8"  # Default: #225ea8 - Primary bar chart color for binary classification
+    class1: "#c7e9b4"  # Default: #c7e9b4 - Secondary bar chart color for binary classification
+  
+  # Multiclass classification colors (for more than 2 classes)
+  multiclass:
+    - "#0c2c84"  # Default: #0c2c84
+    - "#225ea8"  # Default: #225ea8
+    - "#1d91c0"  # Default: #1d91c0
+    - "#41b6c4"  # Default: #41b6c4
+    - "#7fcdbb"  # Default: #7fcdbb
+    - "#c7e9b4"  # Default: #c7e9b4
+    - "#edf8b1"  # Default: #edf8b1
+    - "#ffffd9"  # Default: #ffffd9
+
+  # Background for classification charts
+  background: "#F8F8F8"  # Default: #F8F8F8 - Background color for classification bar charts
+
+# Regression visualization colors
+regression:
+  main: "#0c2c84"       # Default: #0c2c84 - Color for regression visualizations and histograms
+  mean_line: "#8a994e"  # Default: #8a994e - Mean line color
+  hist_alpha: 0.6       # Default: 0.6 - Histogram transparency
+  background: "#F8F8F8" # Default: #F8F8F8 - Background color for regression histogram plots
+
+# Train/test visualization colors
+train_test:
+  train: "#70e4ef"     # Default: #70e4ef - Train set histogram color
+  test: "#dfdf20"      # Default: #dfdf20 - Test set histogram color
+  alpha: 0.8           # Default: 0.8 - Transparency for compare histograms
+
+# Density plot colors
+density:
+  actual: "#00BFC4"    # Default: #00BFC4 - Color for actual values in density plots
+  predicted: "#F8766D" # Default: #F8766D - Color for predicted values in density plots
+  alpha: 0.5           # Default: 0.5 - Transparency for density plots
+  background: "#FAFAFA" # Default: #FAFAFA - Background color for density plots
+
+# Feature importance colors
+feature_importance:
+  bar: "#018f9c"        # Default: #018f9c - Color for feature importance bars
+  background: "#FAFAFA" # Default: #FAFAFA - Background color for feature importance plots
+
+# SHAP plot colors
+shap:
+  positive: "#691a4c"   # Default: #691a4c - Color for positive SHAP values (increases prediction)
+  negative: "#32748E"   # Default: #32748E - Color for negative SHAP values (decreases prediction)
+  background: "#FAFAFA" # Default: #FAFAFA - Background color for SHAP plots
+  
+  # SHAP interactions visualization
+  interactions:
+    heatmap_cmap: "viridis"   # Default: viridis - Colormap for interaction heatmaps
+    dendrogram_cmap: "viridis" # Default: viridis - Colormap for dendrograms
+    link_color: "#1E88E5"      # Default: #1E88E5 - Color for links in dendrograms
+    network_node_color: "#1E88E5" # Default: #1E88E5 - Color for nodes in network graph
+    network_edge_color: "#999999" # Default: #999999 - Color for edges in network graph
+
+# Confusion matrix colors
+confusion_matrix:
+  cmap: "Blues"         # Default: Blues - Default colormap for confusion matrices
+  linewidth: 2          # Default: 2 - Line width for confusion matrix grid
+  linecolor: "black"    # Default: black - Line color for confusion matrix grid
+
+# Correlation plot colors
+correlation:
+  cmap: "twilight_shifted" # Default: twilight_shifted - Colormap for correlation plots
+  background: "#F7F7F7"    # Default: #F7F7F7 - Background color for correlation bar plots
+
+# Per-class SHAP visualization
+per_class_shap:
+  positive: "#1b9e77"    # Default: #1b9e77 - Color for positive impact features
+  negative: "#d95f02"    # Default: #d95f02 - Color for negative impact features
+  class_colors:          # Colors for different classes in multiclass comparison
+    - "#1b9e77" 
+    - "#d95f02"
+    - "#7570b3"
+    - "#e7298a"
+    - "#66a61e"
+    - "#e6ab02"
+    - "#a6761d"
+    - "#666666"

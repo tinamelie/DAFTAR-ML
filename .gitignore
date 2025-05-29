@@ -1,0 +1,42 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+clean-env/
+env/
+venv/
+ENV/
+
+# macOS specific files
+.DS_Store
+
+# Generated files
+color_palette.png
+
+# Jupyter notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test directories and outputs
+test_cv_comp/
+test_daftar_comp/
+DAFTAR-ML_*/
+*_fold_*_samples.csv
+seed_test_report.txt
+CV_*_results/
+
+# Logs
+*.log
