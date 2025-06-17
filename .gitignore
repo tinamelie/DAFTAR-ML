@@ -19,6 +19,7 @@ ENV/
 
 # Generated files
 color_palette.png
+daftar_colors.png
 
 # Jupyter notebooks
 .ipynb_checkpoints
@@ -37,6 +38,13 @@ DAFTAR-ML_*/
 *_fold_*_samples.csv
 seed_test_report.txt
 CV_*_results/
+output/
+_trial_temp/
+
+# Data files (should not be in repo)
+Xylose_*.csv
+*_feature_scores.csv
+*_report.txt
 
 # Logs
 *.log
