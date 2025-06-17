@@ -12,6 +12,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional, Any
 import matplotlib.pyplot as plt
 from pathlib import Path
+from daftar.viz.common import save_plot
 
 
 def check_duplicate_columns(df: pd.DataFrame) -> Dict[str, List[str]]:
@@ -169,8 +170,8 @@ def analyze_feature_distribution(
         plt.tight_layout()
         
         if output_dir:
-            plt.savefig(output_dir / "numeric_distributions.png")
-            plt.close()
+            fig = plt.gcf()
+            save_plot(fig, output_dir / "numeric_distributions.png")
         else:
             plt.show()
     
@@ -195,8 +196,8 @@ def analyze_feature_distribution(
         plt.xticks(rotation=45)
         
         if output_dir:
-            plt.savefig(output_dir / f"categorical_{col}.png")
-            plt.close()
+            fig = plt.gcf()
+            save_plot(fig, output_dir / f"categorical_{col}.png")
         else:
             plt.show()
 

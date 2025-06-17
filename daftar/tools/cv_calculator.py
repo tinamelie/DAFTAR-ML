@@ -24,7 +24,7 @@ from daftar.viz.colors import (
     get_train_test_colors,
     HISTOGRAM_BG_COLOR,
     CLASSIFICATION_BAR_BG_COLOR,
-    REGRESSION_HIST_ALPHA
+    REGRESSION_CV_HIST_ALPHA
 )
 
 
@@ -408,7 +408,7 @@ def plot_hist_or_bar(
         hist_color = get_color_palette(is_classification=False)
         
         # Create histogram with computed bins
-        sns.histplot(series, kde=False, bins=bins, color=hist_color, alpha=REGRESSION_HIST_ALPHA, ax=ax)
+        sns.histplot(series, kde=False, bins=bins, color=hist_color, alpha=REGRESSION_CV_HIST_ALPHA, ax=ax)
         ax.set_xlabel("Target Value")
         ax.set_ylabel("Frequency")
         mean = series.mean()
@@ -453,7 +453,6 @@ def plot_fold_comparison(
                     palette=train_test_colors)
         ax.set_xlabel("Class")
         
-        # Remove "Set" header from legend
         handles, _ = ax.get_legend_handles_labels()
         ax.legend(handles, ["Train", "Test"])
         
@@ -550,7 +549,7 @@ def _build_base_command(cmd_name: str, args: argparse.Namespace, seed: int, is_c
     Returns:
         List of command parts
     """
-    cmd = [cmd_name, f"--input {args.input}", f"--target {args.target}", f"--id {args.id}"]
+    cmd = [cmd_name, f"--input {args.input}", f"--target {args.target}", f"--sample {args.sample}"]
     
     # Add CV parameters
     if include_default_args or args.outer != 5:
@@ -631,14 +630,14 @@ def get_args() -> argparse.Namespace:
         description="Visualise target values across nested CV splits.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         allow_abbrev=False,
-        usage="daftar-cv [-h] --input PATH --target COLUMN --id COLUMN [--outer INTEGER] [--inner INTEGER] [--repeats INTEGER] [--seed INTEGER] [--stratify {true,false}] [--task_type {classification,regression}] [--output_dir PATH] [--force] [--granular] [--alpha FLOAT]",
+        usage="daftar-cv [-h] --input PATH --target COLUMN --sample COLUMN [--outer INTEGER] [--inner INTEGER] [--repeats INTEGER] [--seed INTEGER] [--stratify {true,false}] [--task_type {classification,regression}] [--output_dir PATH] [--force] [--granular] [--alpha FLOAT]",
         epilog="""EXAMPLES:
 
   Default usage (auto-detects task type, uses default 5×3×3 CV setup):
-    daftar-cv --input PATH --target COLUMN --id COLUMN
+    daftar-cv --input PATH --target COLUMN --sample COLUMN
 
   Custom CV setup with 10 outer folds, 5 inner folds, repeated 2 times:
-    daftar-cv --input PATH --target COLUMN --id COLUMN --outer 10 --inner 5 --repeats 2 --seed 42
+    daftar-cv --input PATH --target COLUMN --sample COLUMN --outer 10 --inner 5 --repeats 2 --seed 42
 """
     )
 
@@ -650,7 +649,7 @@ def get_args() -> argparse.Namespace:
 
     req.add_argument("--input", required=True, metavar="PATH", help="Path to CSV data file")
     req.add_argument("--target", required=True, metavar="COLUMN", help="Target column name")
-    req.add_argument("--id", required=True, metavar="COLUMN", help="ID column name")
+    req.add_argument("--sample", required=True, metavar="COLUMN", help="Column containing sample identifiers")
 
     cv.add_argument("--outer", type=int, default=5, metavar="INTEGER", help="Outer folds (default=5)")
     cv.add_argument("--inner", type=int, default=3, metavar="INTEGER", help="Inner folds (default=3)")
@@ -707,11 +706,11 @@ def main() -> None:
 
     # Read data & task type
     df = pd.read_csv(input_path)
-    if args.target not in df.columns or args.id not in df.columns:
+    if args.target not in df.columns or args.sample not in df.columns:
         sys.exit("[ERROR] target or id column missing in data")
 
     y = df[args.target]
-    ids = df[args.id]
+    ids = df[args.sample]
     
     # Determine task type (auto-detect or user override)
     if args.task_type is None:
@@ -844,7 +843,7 @@ def main() -> None:
         ax = axes[fold - 1, rep - 1]
         tr_y, te_y = y.iloc[tr_idx], y.iloc[te_idx]
         
-        # Get p-value from our map - now we have p-values for ALL repeats
+        # Get p-value from our map
         p_value = pval_map.get((rep, fold), None)
         
         # Use the specialized comparison plot function
@@ -871,7 +870,7 @@ def main() -> None:
         f"- Total samples: {len(y)}",
         f"- TASK TYPE: {task_type.upper()}",
         f"- TARGET COLUMN: {args.target}",
-        f"- ID COLUMN: {args.id}",
+        f"- ID COLUMN: {args.sample}",
         "",
         "CROSS‑VALIDATION SETUP",
         "-" * 40,

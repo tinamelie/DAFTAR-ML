@@ -45,30 +45,17 @@ If you encounter conflicts during upgrade, you can try a clean reinstall:
 pip uninstall -y daftar-ml
 pip install git+https://github.com/tinamelie/DAFTAR-ML.git
 ```
-
-### Development Installation
-
-For development or to make local modifications:
-
-```bash
-git clone https://github.com/tinamelie/DAFTAR-ML.git
-cd DAFTAR-ML
-pip install -e .
-```
-
-The `-e` flag installs in "editable" mode, so your changes to the code will be immediately available.
-
 ## Overview
 
 DAFTAR‑ML expects a comma‑separated file (csv) with:
 
-- Unique sample identifier (--id)
+- Unique sample identifier (--sample)
 - Continuous or categorical response (--target)
 - Features for prediction
  
 ### **input.csv example:**
 
- Identifier&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Target column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
+&nbsp;&nbsp;Sample&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Target column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature columns
 | Species | **Xylose_growth** | Gene_cluster1 | Gene_cluster2 | Gene_cluster3 |
 |----------|:---------------:|:-------------:|:-------------:|:-------------:|
 | Species1 |     **0.34**    |       10      |       0       |       15      |
@@ -77,7 +64,7 @@ DAFTAR‑ML expects a comma‑separated file (csv) with:
 
 In this gene–phenotype example, OrthoFinder gene clusters are our **features**, and the **target** column (Xylose_growth) records each species' growth rate in xylose. DAFTAR-ML will reveal which **features** most strongly drive that target.
 
-### Results example (summary):
+### Results example:
 | Rank |    Feature    |  SHAP Score |
 |------|:-------------:|:------:|
 | 1    | Gene_cluster2 |  0.556 |
@@ -96,28 +83,28 @@ A typical DAFTAR-ML workflow consists of three steps:
 
 ### 1. Preprocess raw data (optional)
 ```bash
-daftar-preprocess --input input.csv --target Xylose_growth --id Species
+daftar-preprocess --input input.csv --target Xylose_growth --sample Species
 ```
 
 ### 2. Visualize CV splits (optional)
 ```bash
-daftar-cv --input preprocessed_input.csv --target Xylose_growth --id Species
+daftar-cv --input preprocessed_input.csv --target Xylose_growth --sample Species
 ```
 
 ### 3. Run the main pipeline
 ```
-daftar --input preprocessed_input.csv --target Xylose_growth --id Species --model {xgb,rf} --seed 893200
+daftar --input preprocessed_input.csv --target Xylose_growth --sample Species --model {xgb,rf} --seed 893200
 ```
 
 ### Interpreting your results
 
-For most applications, **shap_bar_impact.png** provides the best balance between interpretability and statistical robustness, indicating which features are important and how they influence predictions.
+For most applications, **top_shap_bar_plot.png** provides the best balance between interpretability and statistical robustness, indicating which features are important and how they influence predictions.
 
 ## Input Data
 
 DAFTAR-ML expects a comma-separated (.csv) matrix with the following columns:
 
-- **Identifier**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--id COLUMN`.
+- **Identifier**: Unique sample identifier (species, strain, isolate, etc.). Specify with `--sample COLUMN`.
 - **Target**: Response variable to predict (e.g., growth rate, yield, etc.). May be continuous (regression) or categorical (binary or multiclass classification). Specify with `--target COLUMN`.     
 - **Features**: Predictor columns (e.g., orthologous gene counts, CAI values, expression profiles).
 
@@ -135,7 +122,7 @@ Examples provided in [`test_data/`](test_data):
 Before running DAFTAR-ML, prepare your data using the preprocessing script to filter your data. This step is optional but recommended for better performance and more accurate results:
 
 ```bash
-daftar-preprocess --input PATH --target COLUMN --id COLUMN --output_dir PATH
+daftar-preprocess --input PATH --target COLUMN --sample COLUMN --output_dir PATH
 ```
 The preprocessing module uses mutual information to select features with the strongest relationship to the target variable, without assuming linearity. It selects the top-k features with highest MI scores, reducing dimensionality while preserving predictive power. Results include a summary report of transformations and selected features. It produces the following files:
 
@@ -151,7 +138,7 @@ The preprocessing module uses mutual information to select features with the str
 #### Required Parameters:
 * `--input PATH`: Path to input CSV file
 * `--target COLUMN`: Target column name to predict
-* `--id COLUMN`: Name of the identifier column (e.g., species identifiers, sample names)
+* `--sample COLUMN`: Name of the identifier column (e.g., species identifiers, sample names)
 
 #### Optional Parameters:
 
@@ -160,7 +147,7 @@ The preprocessing module uses mutual information to select features with the str
 * `--force`: Force overwrite if output file already exists.
 
 ##### Analysis Configuration:
-* `--task {regression,classification}`: Problem type. Optional and not recommended - dataset type will be auto-detected.
+* `--task_type {regression,classification}`: Problem type. Optional and not recommended - dataset type will be auto-detected.
 * `--k INTEGER`: Number of top features to select based on mutual information scores. Higher values retain more features but may include less informative ones and slow processing. Lower values provide a more focused feature set (default: 500).
 
 ##### Data Transformations:
@@ -195,7 +182,7 @@ Note: This does not produce any modified or processed data from your input. This
 ##### CV Calculator Usage
 
 ```bash
-daftar-cv --input PATH --target COLUMN --id COLUMN --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir PATH
+daftar-cv --input PATH --target COLUMN --sample COLUMN --outer INTEGER --inner INTEGER --repeats INTEGER --output_dir PATH
 ```
 
 #### CV Calculator Parameters
@@ -203,7 +190,7 @@ daftar-cv --input PATH --target COLUMN --id COLUMN --outer INTEGER --inner INTEG
 ##### Required Parameters:
 * `--input PATH`: Path to the preprocessed CSV file containing your feature data
 * `--target COLUMN`: Name of the target column to predict
-* `--id COLUMN`: Name of the identifier column (e.g., species, sample names)
+* `--sample COLUMN`: Name of the identifier column (e.g., species, sample names)
 
 #### Optional Parameters:
 
@@ -230,9 +217,10 @@ daftar-cv --input PATH --target COLUMN --id COLUMN --outer INTEGER --inner INTEG
 * `fold_[N]_samples.csv`: Per-fold CSV file listing all samples with their ID, target value, and assignment (Train/Test)
 
 ##### Visualizations:
-* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_overall_distribution.png/pdf`: Histogram/density plot of the overall target distribution with automatically optimized bin sizes
-* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_histograms.png/pdf`: Multi-panel visualization comparing train/test distributions for each fold with automatically optimized bin sizes
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_overall_distribution.png`: Histogram/density plot of the overall target distribution with automatically optimized bin sizes
+* `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_histograms.png`: Multi-panel visualization comparing train/test distributions for each fold with automatically optimized bin sizes
 * `fold_[N]_distribution.png`: Individual fold histograms showing train/test distribution for each fold
+* `svg/` subdirectory: Contains SVG versions of all plots for high-quality vector graphics
 
 ##### Reports:
 * `CV_[target]_[task-type]_cv[outer]x[inner]x[repeats]_fold_report.txt`: Statistical assessment of fold quality with p-value tests
@@ -248,6 +236,7 @@ Note: Larger p-values are better for fold quality.
 - DAFTAR-ML's cross-validation implementation **always uses shuffling by default** to ensure more representative data distribution across splits.
 - **Stratified sampling** is used by default for classification tasks but can be disabled with `--stratify false`.
 - For regression tasks, standard (non-stratified) sampling is used by default but can be enabled with `--stratify true` if your target values benefit from balanced distribution.
+- All fold indexing is **zero-based** (starting from 0). For example, with 5 outer folds, they are numbered 0 through 4 in all output files and visualizations.
 
 ##### Rules of thumb:
 
@@ -263,7 +252,7 @@ Note: Larger p-values are better for fold quality.
 After preprocessing your data and planning your cross-validation strategy, run the main DAFTAR-ML pipeline to train models, analyze feature importance, and generate visualizations:
 
 ```bash
-daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PATH
+daftar --input PATH --target COLUMN --sample COLUMN --model {xgb,rf} --output_dir PATH
 ```
 #### DAFTAR-ML Pipeline
 
@@ -271,7 +260,7 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 2. **Hyperparameter Optimization**: Uses Optuna to efficiently tune model parameters
 3. **Model Training**: Trains optimized models for each fold
 4. **Performance Evaluation**: Calculates metrics across all CV folds
-5. **Feature Importance Analysis**: Generates SHAP-based feature rankings
+5. **SHAP Value Analysis**: Generates SHAP-based feature rankings
 6. **Visualization**: Produces figures and tables
 
 #### DAFTAR-ML Parameters
@@ -279,13 +268,13 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 #### Required Parameters:
 * `--input PATH`: Path to the preprocessed CSV file containing features and target variable
 * `--target COLUMN`: Name of the target column to predict in the input file
-* `--id COLUMN`: Name of the identifier column (e.g., species, sample names)
+* `--sample COLUMN`: Name of the identifier column (e.g., species, sample names)
 * `--model {xgb,rf}`: Machine learning algorithm to use (xgb=XGBoost, rf=Random Forest)
 
 #### Optional Parameters:
 
 ##### Analysis Configuration:
-* `--task {regression,classification}`: Problem type (regression or classification). Auto-detected if not specified
+* `--task_type {regression,classification}`: Problem type (regression or classification). Auto-detected if not specified
 * `--metric {mse,rmse,mae,r2,accuracy,f1,roc_auc}`: Performance metric to optimize. For regression: 'mse', 'rmse', 'mae', 'r2'; for classification: 'accuracy', 'f1', 'roc_auc' (default: 'mse' for regression, 'accuracy' for classification)
 
 ##### Cross-validation Configuration:
@@ -295,6 +284,10 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 
 ##### Optimization Configuration:
 * `--patience INTEGER`: Number of trials to wait without improvement before stopping hyperparameter optimization (default: 50)
+  - 50 is a good balance between exploration and computational efficiency
+  - Small datasets (< 1000 samples): 30-50 trials is usually sufficient
+  - Medium datasets (1000-10000 samples): 50-100 trials allows for thorough search
+  - Large/complex datasets: 100+ can find better hyperparameters but with diminishing returns
 * `--threshold FLOAT`: Minimum improvement to consider a new trial better than previous best. Defaults: 1e-6 (MSE), 1e-4 (RMSE/MAE), 1e-3 (R²/accuracy/f1/roc_auc)
 
 ##### Execution Configuration:
@@ -303,6 +296,7 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 
 ##### Visualization Configuration:
 * `--top_n INTEGER`: Number of top features to include in visualizations (default: 15)
+* `--skip_interaction`: Skip SHAP interaction calculations for faster execution (regression only). When enabled, feature interaction analysis will be bypassed, reducing computation time at the cost of interaction insights.
 
 ##### Output Configuration:
 * `--output_dir PATH`: Directory where output files will be saved. If not specified, an auto-generated directory name will be created
@@ -313,23 +307,21 @@ daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} --output_dir PA
 
 Each run creates a folder in either the current directory or the directory specified by `--output_dir`
 
+### Visualizations and File Formats
+
+All visualizations in DAFTAR-ML are provided in two formats:
+
+* **PNG format**: Standard bitmap images saved in their original locations
+* **SVG format**: Vector graphics to use in graphical editors like Inkscape or Adobe Illustrator, stored in `svg/` subdirectories
+
 ### Understanding SHAP Analysis
 
 DAFTAR-ML uses SHAP (SHapley Additive exPlanations) to provide interpretable feature importance analysis. SHAP values quantify how much each feature contributes to individual predictions.
 
-#### Feature Importance Calculation Approaches
+#### SHAP Value Terminology:
 
-DAFTAR-ML uses two complementary approaches to calculate feature importance metrics:
-
-**Fold-Level Calculations**: First averaged within each fold, then across folds
-* Provides better statistical robustness through cross-validation
-* Less sensitive to outliers and data variations
-* Shows features with consistent importance across different data splits
-* Preferred for finding generally reliable predictive features
-
-**Global Calculations**: Aggregated across all samples in the dataset
-* Captures overall feature impact patterns across the entire dataset
-* Used for certain visualizations that benefit from using all data points
+* **SHAP Value:** The actual signed value showing direction of influence (positive increases prediction, negative decreases prediction)
+* **Magnitude:** The absolute SHAP value used for ranking feature importance. Features are typically ordered by magnitude in visualizations.
 
 #### Interpreting SHAP Visualizations
 
@@ -349,33 +341,44 @@ Patterns to look for:
 * Non-linear effects: Same colors appearing on both sides
 
 ##### Bar Plots
-The summary bar plots show average magnitude of feature impacts:
-* For classification: Red/blue bars show direction of impact on different classes
-* For regression: Direction shows whether feature increases/decreases predictions
-
-##### Correlation Plots (Regression Only)
-For regression problems, correlation plots show relationship between feature SHAP values and the target:
-* Red bars (positive correlation): Higher feature values → higher predictions
-* Blue bars (negative correlation): Higher feature values → lower predictions
-
+Features are ordered by magnitude (absolute SHAP value)
+* Bar direction shows SHAP value (positive increases prediction, negative decreases prediction)
+* Colors indicate direction: red for positive, blue for negative
+* Error bars show variation across cross-validation folds
 
 ### Model and Problem Type Specific Outputs
 
-Dependending on which model type (XGBoost/Random Forest) and problem type (regression/classification) you use, DAFTAR-ML produces different specialized visualizations and analyses:
+Depending on which model type (XGBoost/Random Forest) and problem type (regression/classification) you use, DAFTAR-ML produces different specialized visualizations and analyses:
 
 | Problem Type | Model Type | Specialized Outputs |
 |--------------|------------|---------------------|
-| **Regression** | XGBoost | • Feature interaction analysis<br>• Feature correlation plots<br>• SHAP interaction network visualization |
-| **Regression** | Random Forest | • Feature correlation plots |
-| **Classification** | XGBoost/Random Forest | • Per-class feature importance analysis<br>• Class-specific SHAP impact plots<br>• Confusion matrices<br>• Multiclass comparison (for >2 classes) |
+| **Regression** | XGBoost/Random Forest | • Feature interaction analysis<br>• SHAP interaction network visualization |
+| **Classification** | XGBoost/Random Forest | • Per-class feature importance analysis<br>• Class-specific SHAP plots<br>• Confusion matrices<br>• Multiclass comparison (for >2 classes) |
 
-#### Feature Interactions (XGBoost Regression Only)
-When using XGBoost for regression problems, DAFTAR-ML performs an additional analysis of how features interact with each other:
+#### Feature Interactions (Regression Only)
+When using tree-based regression models (XGBoost and Random Forest regression), DAFTAR-ML performs an additional analysis of how features interact with each other using SHAP TreeExplainer:
 
-* `interaction_network.png`: Network visualization showing how features connect and influence each other
-* `interaction_heatmap.png`: Heatmap visualization of pairwise feature interaction strengths
-* `interaction_matrix.csv`: Full matrix of numerical interaction values 
-* `interaction_strength.csv`: Ranked list of the strongest feature interactions
+**Note:** This analysis can be skipped using the `--skip_interaction` flag for faster execution.
+
+**Technical Implementation:**
+- Only regression models support SHAP interaction computation for simplicity
+- Uses SHAP TreeExplainer directly for reliable interaction computation
+- Compatible with XGBoost and Random Forest regression models only
+
+**Output Files:**
+* `interaction_network.png`: Network of top 20 strongest feature interactions
+* `interaction_heatmap.png`: Heatmap showing the top 20 features by interaction strength
+* `top_bottom_network.png`: Network showing interactions between the 10 most positive and 10 most negative SHAP-scored features
+* `interaction_matrix.csv`: Full numerical interaction matrix for all computed interactions
+* `interaction_strength.csv`: Ranked list of all feature interactions by average magnitude
+
+**Interaction Calculation Process:**
+1. For each fold, SHAP interaction values are computed using TreeExplainer directly on the test data
+2. Sample-level: interactions are averaged across test samples to create fold-specific matrices
+3. Cross-fold: per-fold interaction matrices are aggregated preserving feature union (no penalty for absent features)
+4. Visualization: strongest interactions are displayed in network and heatmap plots
+
+**Note:** Classification models do not yet support feature interactions due to TreeExplainer shape complexity with multi-class outputs.
 
 #### Per-Class Feature Analysis (Classification Only)
 For classification problems (both XGBoost and Random Forest), DAFTAR-ML analyzes which features are most important for predicting each specific class:
@@ -390,21 +393,27 @@ For classification problems (both XGBoost and Random Forest), DAFTAR-ML analyzes
 ```
 DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
 ├── DAFTAR-ML_run.log                     # Combined console + file log
-├── performance.txt                       # Summary metrics across folds
+├── model_performance.txt                       # Summary metrics across folds
 ├── feature_importance/                   # Feature importance directory
 │   ├── feature_importance_values.csv        # Consolidated feature importance (mean ± std)
-│   └── feature_importance_bar.png           # Bar visualization of top features
+│   ├── feature_importance_bar.png           # Bar visualization of top features
+│   └── svg/                                 # SVG versions of plot files
+│       └── feature_importance_bar.svg       # SVG version for high-quality vector graphics
 ├── shap_beeswarm_impact.png               # SHAP impact beeswarm plot
 ├── shap_bar_impact.png                    # Feature impact by absolute SHAP magnitude
 ├── shap_bar_pos_neg_impact.png            # Features with positive and negative impacts
+├── svg/                                    # SVG versions of plot files
+│   ├── shap_beeswarm_impact.svg           # SVG version of SHAP impact beeswarm plot
+│   ├── shap_bar_impact.svg                # SVG version of feature impact plot
+│   └── shap_bar_pos_neg_impact.svg        # SVG version of positive/negative impact plot
 ├── shap_features_analysis.csv             # Complete feature metrics with all statistics
 ├── shap_features_summary.txt              # Comprehensive feature analysis and rankings
 ├── shap_values_all_folds.csv              # Combined SHAP values from all folds
 ├── predictions_vs_actual_overall.csv      # Combined predictions from all folds
-├── density_actual_vs_pred_global.png      # Regression density plot (regression only)
+├── density_plot_overall.png                # Regression density plot (regression only)
 ├── figures_explanation.txt                # Detailed explanations of all output visualizations
 ├── config.json                            # Record of all settings used in the analysis
-├── shap_feature_interactions/             # Feature interaction visualizations (XGBoost regression only)
+├── shap_feature_interactions/             # Feature interaction visualizations (regression only)
 │   ├── interaction_network.png            # Network graph of feature interactions
 │   ├── interaction_heatmap.png            # Heatmap of interaction strengths
 │   ├── interaction_matrix.csv             # Matrix of interaction strengths
@@ -435,7 +444,7 @@ Instead of passing a long list of CLI flags you can store them in a YAML file:
 
 ```yaml
 input: PATH
-id: COLUMN
+sample: COLUMN
 target: COLUMN
 model: xgb
 outer: 5
@@ -463,9 +472,9 @@ DAFTAR-ML includes a utility to display all the color palettes used in its visua
 daftar-colors --output_dir PATH
 ```
 
-Color management is separated into two components:
-1. `daftar/viz/colors.py` + `daftar/viz/colors.yaml`: Contains all color definitions and utilities
-2. `daftar/tools/colors.py`: A visualization tool for displaying the color palettes
+Color management is consolidated into:
+- `daftar/viz/colors.py`: Contains all color definitions, utilities, and visualization tools
+- `daftar/viz/colors.yaml`: Centralized color configuration file
 
 To customize colors, modify the `colors.yaml` configuration file. 
 
@@ -473,50 +482,43 @@ To customize colors, modify the `colors.yaml` configuration file.
 ## Code Structure
 
 ```
-daftar/                   # Main library package
-├── core/                    # Core pipeline components
-│   ├── pipeline.py          # Main pipeline
-│   ├── data_processing.py   # Data loading and preparation
-│   ├── evaluation.py        # Generic evaluation logic
-│   ├── config.py            # Configuration handling
-│   ├── callbacks.py         # Optimization callbacks
-│   └── logging_utils.py     # Logging utilities
-├── models/                  # All model implementations
-│   ├── base.py              # Base model classes
-│   ├── regression/          # Regression models
-│   └── classification/      # Classification models
-├── analysis/                # Analysis by problem type
-│   ├── __init__.py
-│   ├── regression.py        # Regression-specific analysis
-│   └── classification.py    # Classification-specific analysis
-├── viz/                     # All visualizations
-│   ├── __init__.py
-│   ├── common.py            # Common visualization utilities
-│   ├── regression.py        # Regression visualizations
-│   ├── classification.py    # Classification visualizations
-│   ├── shap.py              # SHAP visualizations (simplified)
-│   ├── feature_importance.py # Feature importance visualizations
-│   ├── color_definitions.py  # Centralized color definitions
-│   └── optuna.py            # Hyperparameter tuning visualizations
-├── utils/                   # General utilities
-│   ├── __init__.py
-│   ├── validation.py        # Data validation
-│   ├── file_utils.py        # File handling
-│   └── warnings.py          # Warning management
-├── tools/                   # Command-line tools
-│   ├── __init__.py
-│   ├── preprocess.py        # Preprocessing script
-│   ├── cv_calculator.py     # CV calculation script
-│   ├── colors.py            # Color visualization tool
-│   └── run_daftar.py        # Main entry point script
-└── cli.py                   # Command-line interface
+daftar/                      # Main library package
+├── core/                       # Core pipeline components
+│   ├── pipeline.py             # Main pipeline
+│   ├── data_processing.py      # Data loading and preparation
+│   ├── evaluation.py           # Model evaluation logic
+│   ├── config.py               # Configuration management
+│   ├── callbacks.py            # Hyperparameter optimization callbacks
+│   └── logging_utils.py        # Logging utilities
+├── models/                     # Model implementations
+│   ├── xgb_base.py             # Base XGBoost model
+│   ├── rf_base.py              # Base Random Forest model
+│   ├── xgb_regression.py       # XGBoost regression implementation
+│   ├── rf_regression.py        # Random Forest regression implementation
+│   ├── xgb_classification.py   # XGBoost classification implementation
+│   ├── rf_classification.py    # Random Forest classification implementation
+│   └── hyperparams.yaml        # Hyperparameter search spaces
+├── viz/                        # Visualization modules
+│   ├── common.py               # Common visualization utilities
+│   ├── predictions.py          # Prediction visualization
+│   ├── feature_importance.py   # Feature importance plots
+│   ├── shap.py                 # SHAP visualizations 
+│   ├── shap_interaction_utils.py # SHAP interaction utilities
+│   ├── colors.py               # Color utility functions
+│   ├── colors.yaml             # Centralized color definitions
+│   └── plotting_utils.py       # General plotting utilities
+├── utils/                      # General utilities
+│   ├── validation.py           # Data validation
+│   ├── file_utils.py           # File handling 
+│   ├── stats.py                # Statistical utilities
+│   └── timer.py                # Timing utilities
+└── cli.py                      # Command-line interface
 
 # Root level files
-setup.py                     # Package installation configuration
-requirements.txt             # Package dependencies
-example_config.yaml          # Example YAML configuration
-test_data/                   # Example datasets for testing
-
+setup.py                        # Package installation 
+requirements.txt                # Package dependencies
+LICENSE                         # License information
+README.md                       # This documentation
 ```
 
 
@@ -530,7 +532,7 @@ If you use DAFTAR-ML in academic work, please cite:
   title   = {DAFTAR-ML},
   year    = {2025},
   url     = {https://github.com/tinamelie/DAFTAR-ML},
-  version = {v0.1.4}
+  version = {v0.1.5}
 }
 ```
 

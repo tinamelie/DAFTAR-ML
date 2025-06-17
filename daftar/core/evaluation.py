@@ -36,7 +36,7 @@ def calculate_overall_metrics(fold_metrics: List[Dict[str, float]]) -> Dict[str,
 
 def save_metrics(metrics: Dict, fold_metrics: List[Dict], output_dir: Path) -> str:
     """
-    Save overall and per-fold metrics to a text file.
+    Save overall and per-fold metrics to text and CSV files.
     
     Args:
         metrics: Overall metrics dictionary
@@ -84,7 +84,42 @@ def save_metrics(metrics: Dict, fold_metrics: List[Dict], output_dir: Path) -> s
             for metric_name, metric_value in fold_metric.items():
                 f.write(f"  {metric_name}:  {metric_value:.7f}\n")
             f.write("\n")
-        
+    
+    # Also add metrics to overall predictions CSV if it exists using pandas
+    try:
+        predictions_csv = output_dir / "predictions_vs_actual_overall.csv"
+        if predictions_csv.exists():
+            # Read the CSV into a DataFrame
+            df = pd.read_csv(predictions_csv)
+            
+            # Create header with overall metrics
+            metric_header = "# DAFTAR-ML Overall Performance Metrics: "
+            if 'r2' in metrics:
+                metric_header += f"R² = {metrics['r2']:.6f}, "
+            if 'rmse' in metrics:
+                metric_header += f"RMSE = {metrics['rmse']:.6f}, "
+            if 'mae' in metrics:
+                metric_header += f"MAE = {metrics['mae']:.6f}, "
+            if 'accuracy' in metrics:
+                metric_header += f"Accuracy = {metrics['accuracy']:.6f}, "
+            if 'f1' in metrics:
+                metric_header += f"F1 = {metrics['f1']:.6f}, "
+            if 'roc_auc' in metrics:
+                metric_header += f"ROC AUC = {metrics['roc_auc']:.6f}, "
+            
+            # Remove trailing comma and space if present
+            if metric_header.endswith(", "):
+                metric_header = metric_header[:-2]
+            
+            # Write the header as a comment and then the DataFrame
+            with open(predictions_csv, 'w') as f:
+                f.write(f"{metric_header}\n")
+                df.to_csv(f, index=False)
+                
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not add metrics to overall predictions CSV: {e}")
+    
     return str(txt_file)
 
 

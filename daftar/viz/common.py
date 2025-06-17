@@ -20,7 +20,7 @@ def set_plot_style():
     plt.rcParams['ytick.labelsize'] = 12
     plt.rcParams['legend.fontsize'] = 12
     # Higher DPI for clearer plots
-    plt.rcParams['figure.dpi'] = 150
+    plt.rcParams['figure.dpi'] = 300
     # Modern color palette - using default matplotlib colors instead of custom
     # Transparent background for better embedding
     plt.rcParams['figure.facecolor'] = 'white'
@@ -29,21 +29,36 @@ def set_plot_style():
 
 def save_plot(fig, output_path, tight_layout=True):
     """Save a figure to the specified path with standard formatting.
+    Automatically saves in both PNG and SVG formats.
     
     Args:
         fig: Matplotlib figure object
-        output_path: Path to save the figure
+        output_path: Path to save the figure (should include file extension)
         tight_layout: Whether to apply tight_layout before saving
     """
     if tight_layout:
-        fig.tight_layout()
+        try:
+            fig.tight_layout()
+        except:
+            pass
     
     # Create directory if it doesn't exist
-    output_dir = Path(output_path).parent
+    output_path = Path(output_path)
+    output_dir = output_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save with high quality
-    fig.savefig(output_path, bbox_inches='tight', dpi=150)
+    # Save with high quality in PNG format
+    fig.savefig(output_path, bbox_inches='tight', dpi=300)
+    
+    # Create svg subdirectory
+    svg_dir = output_dir / 'svg'
+    svg_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Also save as SVG in the svg subdirectory
+    svg_filename = output_path.name.replace('.png', '.svg')
+    svg_path = svg_dir / svg_filename
+    fig.savefig(svg_path, bbox_inches='tight', format='svg')
+    
     plt.close(fig)
 
 

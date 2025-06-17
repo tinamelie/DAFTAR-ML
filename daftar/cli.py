@@ -20,6 +20,14 @@ import daftar  # For version information
 # Suppress XGBoost warnings globally
 suppress_xgboost_warnings()
 
+# Terminal color codes
+GREEN = '\033[32m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+PINK = '\033[95m'
+BRIGHT_GREEN = '\033[92;1m'
+BOLD = '\033[1m'
+RESET = '\033[0m'
 
 # Custom formatter that doesn't show defaults for required arguments
 class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
@@ -54,7 +62,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     """
     parser = argparse.ArgumentParser(description="DAFTAR-ML: Feature Importance via Repeated Annotation of Trees", 
         formatter_class=CustomHelpFormatter,
-        usage="daftar --input PATH --target COLUMN --id COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task {regression,classification}] [--metric {mse,rmse,mae,r2,accuracy,f1,roc_auc}] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
+        usage="daftar --input PATH --target COLUMN --sample COLUMN --model {xgb,rf} [--output_dir PATH] [--inner INTEGER] [--outer INTEGER] [--repeats INTEGER] [--stratify {true,false}] [--config PATH] [--task_type {regression,classification}] [--metric {mse,rmse,mae,r2,accuracy,f1,roc_auc}] [--patience INTEGER] [--threshold FLOAT] [--top_n INTEGER] [--force] [--verbose] [--cores INTEGER] [--seed INTEGER]"
     )
     
     # Customize help message to capitalize 'Show'
@@ -80,11 +88,10 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     )
     
     required_args.add_argument(
-        "--id",
+        "--sample",
         type=str,
         required=True,
-        metavar="COLUMN",
-        help="Column with sample IDs"
+        help="Name of the column containing sample identifiers"
     )
     
     required_args.add_argument(
@@ -149,7 +156,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     )
     
     optional_args.add_argument(
-        "--task",
+        "--task_type",
         type=str,
         choices=["regression", "classification"],
         help="Type of problem (regression or classification). Optional - will be auto-detected if not specified"
@@ -176,7 +183,7 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     opt_args.add_argument(
         "--threshold",
         type=float,
-        default=1e-6,
+        default=None,  # No default so we can detect explicit usage
         metavar="FLOAT",
         help="Minimum improvement threshold for early stopping"
     )
@@ -190,6 +197,12 @@ def parse_args(args: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
         default=15,
         metavar="INTEGER",
         help="Number of top features to include in visualizations"
+    )
+    
+    viz_args.add_argument(
+        "--skip_interaction",
+        action="store_true",
+        help="Skip SHAP interaction calculations (faster execution)"
     )
     
     out_args.add_argument(
@@ -244,15 +257,16 @@ def main(args: Optional[List[str]] = None) -> int:
     """
     # Display the ASCII art logo
     print("")
-    print("""██████╗  █████╗ ███████╗████████╗ █████╗ ██████╗       ███╗   ███╗██╗     
-██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔══██╗      ████╗ ████║██║     
-██║  ██║███████║█████╗     ██║   ███████║██████╔╝█████╗██╔████╔██║██║     
-██║  ██║██╔══██║██╔══╝     ██║   ██╔══██║██╔══██╗╚════╝██║╚██╔╝██║██║     
-██████╔╝██║  ██║██║        ██║   ██║  ██║██║  ██║      ██║ ╚═╝ ██║███████╗
-╚═════╝ ╚═╝  ╚═╝╚═╝        ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝╚══════╝""")
+    print(f"""{GREEN}
+    ██████╗  █████╗ ███████╗████████╗ █████╗ ██████╗       ███╗   ███╗██╗     
+    ██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔══██╗      ████╗ ████║██║     
+    ██║  ██║███████║█████╗     ██║   ███████║██████╔╝█████╗██╔████╔██║██║     
+    ██║  ██║██╔══██║██╔══╝     ██║   ██╔══██║██╔══██╗╚════╝██║╚██╔╝██║██║     
+    ███████╗██║  ██║██║        ██║   ██║  ██║██║  ██║      ██║ ╚═╝ ██║███████╗
+    ╚══════╝╚═╝  ╚═╝╚═╝        ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝╚══════╝{RESET}""")
     print("")  
     # Print the version below the banner
-    print(f"Version {daftar.__version__}")
+    print(f"{CYAN}Version {daftar.__version__}{RESET}")
     print("")
     # Capture the original command
     if args is None:
@@ -323,35 +337,15 @@ def main(args: Optional[List[str]] = None) -> int:
                     if len(unique_values) <= 2 or target_data.dtype == bool:
                         # Binary numeric values (like 0/1) suggest classification
                         task_type = "classification"
-                        print(f"Auto-detected CLASSIFICATION task (binary)")
                     else:
                         # Multiple numeric values suggest regression
                         task_type = "regression"
-                        print(f"Auto-detected REGRESSION task")
                 else:
                     # Non-numeric (string/categorical) data is always classification
                     # (regardless of number of unique values)
                     task_type = "classification"
-                    if len(unique_values) <= 2:
-                        print(f"Auto-detected CLASSIFICATION task (binary)")
-                    else:
-                        print(f"Auto-detected CLASSIFICATION task (multiclass)")
                 
                 config_dict['problem_type'] = task_type
-                
-                # Set default metric based on task type if not specified
-                if 'metric' not in config_dict and getattr(parsed_args, 'metric', None) is None:
-                    if task_type == 'regression':
-                        default_metric = 'mse'
-                        print(f"Using default optimization metric: {default_metric}")
-                    else:  # classification
-                        default_metric = 'accuracy'
-                        print(f"Using default optimization metric: {default_metric}")
-                    config_dict['metric'] = default_metric
-                elif getattr(parsed_args, 'metric', None):
-                    print(f"Using optimization metric: {parsed_args.metric}")
-                elif 'metric' in config_dict:
-                    print(f"Using optimization metric: {config_dict['metric']}")
                 
             except pd.errors.EmptyDataError:
                 print(f"ERROR: The input file is empty: {input_file}")
@@ -363,7 +357,7 @@ def main(args: Optional[List[str]] = None) -> int:
                 
         except Exception as e:
             print(f"ERROR: An unexpected error occurred: {str(e)}")
-            print("Please specify --task [regression|classification] explicitly.")
+            print("Please specify --task_type [regression|classification] explicitly.")
             return 1
     
     # Handle optional arguments
@@ -378,14 +372,16 @@ def main(args: Optional[List[str]] = None) -> int:
                 config_dict['verbose'] = value
             elif arg == 'stratify':
                 config_dict['use_stratified'] = value == 'true'
+            elif arg == 'skip_interaction':
+                config_dict['skip_interaction'] = value
             else:
                 config_dict[arg] = value
     
     # Map CLI parameter names to Config field names
     parameter_mapping = {
         'input': 'input_file',
-        'id': 'id_column',
-        'task': 'problem_type',
+        'sample': 'id_column',
+        'task_type': 'problem_type',
         'inner': 'inner_folds',
         'outer': 'outer_folds',
         'repeats': 'repeats',
@@ -424,26 +420,28 @@ def main(args: Optional[List[str]] = None) -> int:
     # Get the output directory path
     output_dir = config.get_output_dir()
     
-    print(f"DAFTAR-ML analysis completed successfully.")
+    # Message already printed from pipeline
     print(f"Results saved to: {output_dir}")
     
     # Print separator before reproduction command
-    print("\n" + "=" * 80)
+    print("\n" + CYAN + "=" * 80 + RESET)
     
     # Print example command for reproduction with ALL parameters used
     print("\nTo reproduce this run in the future, use:")
+    print("\n")
     cmd = f"daftar --input {config.input_file}"
-    
+
+
     # Add ID column if specified
     if hasattr(config, 'id_column') and config.id_column is not None:
-        cmd += f" --id {config.id_column}"
+        cmd += f" --sample {config.id_column}"
     
     # Add target column
     cmd += f" --target {config.target}"
     
-    # Only include --task if it was explicitly provided
-    if getattr(parsed_args, 'task', None):
-        cmd += f" --task {config.problem_type}"
+    # Only include --task_type if it was explicitly provided
+    if getattr(parsed_args, 'task_type', None):
+        cmd += f" --task_type {config.problem_type}"
         
     cmd += f" --model {config.model}"
     
@@ -460,7 +458,8 @@ def main(args: Optional[List[str]] = None) -> int:
         cmd += f" --metric {config.metric}"
     if hasattr(config, 'patience') and config.patience is not None:
         cmd += f" --patience {config.patience}"
-    if hasattr(config, 'relative_threshold') and config.relative_threshold != 1e-6:
+    # Only include threshold if it was explicitly provided by the user
+    if hasattr(parsed_args, 'threshold') and parsed_args.threshold is not None:
         cmd += f" --threshold {config.relative_threshold}"
     if hasattr(config, 'top_n') and config.top_n != 15:
         cmd += f" --top_n {config.top_n}"

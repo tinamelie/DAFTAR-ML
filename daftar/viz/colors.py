@@ -13,7 +13,7 @@ Usage:
     from daftar.viz.colors import SHAP_POSITIVE_COLOR, SHAP_NEGATIVE_COLOR
     
     # Import utility functions:
-    from daftar.viz.colors import get_color_palette, get_correlation_cmap
+    from daftar.viz.colors import get_color_palette
 """
 
 import os
@@ -128,25 +128,12 @@ def _get_default_colors() -> Dict[str, Any]:
                 "network_edge_color": "#999999"
             }
         },
-        "correlation": {
-            "positive": "#A93226",
-            "negative": "#2471A3",
-            "cmap_type": "diverging",
-            "background": "#F7F7F7"
-        },
+
         "confusion_matrix": {
             "cmap": "Blues",
             "linewidth": 0.5,
             "linecolor": "#cccccc"
         },
-        "per_class_shap": {
-            "positive": "#1b9e77",
-            "negative": "#d95f02",
-            "class_colors": [
-                "#1b9e77", "#d95f02", "#7570b3", "#e7298a",
-                "#66a61e", "#e6ab02", "#a6761d", "#666666"
-            ]
-        }
     }
 
 # ============================================================================
@@ -185,8 +172,8 @@ def get_color_palette(is_classification: bool, class_count: int = None) -> Union
                 # If we need more colors than defined, use a built-in palette
                 return sns.color_palette("husl", class_count)
     else:
-        # Regression task - just use the main regression color
-        return colors["regression"]["main"]
+        # Regression task - use the CV regression color
+        return colors["regression_cv"]["main"]
 
 def get_train_test_colors() -> Dict[str, str]:
     """
@@ -201,30 +188,13 @@ def get_train_test_colors() -> Dict[str, str]:
         "Test": colors["train_test"]["test"]
     }
 
-def get_correlation_cmap() -> LinearSegmentedColormap:
-    """
-    Get colormap for correlation plots.
-    
-    Returns:
-        Matplotlib colormap
-    """
-    colors = load_colors()
-    cmap_name = colors["correlation"]["cmap"]
-    
-    # Handle custom colormaps vs. built-in ones
-    if cmap_name == "twilight_shifted":
-        return plt.cm.twilight_shifted
-    else:
-        return plt.get_cmap(cmap_name)
+
 
 def get_binary_classification_colors() -> List[str]:
     """Get colors for binary classification."""
     colors = load_colors()
     return [colors["classification"]["binary"]["class0"], 
             colors["classification"]["binary"]["class1"]]
-
-# Note: We don't need a separate get_multiclass_colors function since 
-# get_color_palette already handles this case when is_classification=True and class_count>2
 
 def get_shap_colors() -> Dict[str, str]:
     """Get colors for SHAP visualizations."""
@@ -234,12 +204,6 @@ def get_shap_colors() -> Dict[str, str]:
         "negative": colors["shap"]["negative"],
         "background": colors["shap"]["background"]
     }
-
-def get_per_class_shap_colors() -> Dict[str, Any]:
-    """Get colors for per-class SHAP visualizations."""
-    colors = load_colors()
-    return colors["per_class_shap"]
-
 # ============================================================================
 # Color Constants
 # ============================================================================
@@ -257,22 +221,25 @@ CLASSIFICATION_BAR_COLOR = CLASS_BAR_COLOR0  # Default color for classification 
 MULTICLASS_COLORS = _colors["classification"]["multiclass"]
 
 # Regression visualization colors
-REGRESSION_COLOR = _colors["regression"]["main"]  # Color for regression visualizations and histograms
-REGRESSION_MEAN_LINE_COLOR = _colors["regression"]["mean_line"]  # Mean line color
-REGRESSION_HIST_ALPHA = _colors["regression"]["hist_alpha"]  # Histogram transparency
+# CV Regression colors
+REGRESSION_CV_COLOR = _colors["regression_cv"]["main"]  # Color for CV regression histograms
+REGRESSION_CV_MEAN_LINE_COLOR = _colors["regression_cv"]["mean_line"]  # Mean line color in CV plots
+REGRESSION_CV_HIST_ALPHA = _colors["regression_cv"]["hist_alpha"]  # Histogram transparency in CV plots
 
 # Compare train/test visualization colors
 TRAIN_HIST_COLOR = _colors["train_test"]["train"]  # Train set histogram color
 TEST_HIST_COLOR = _colors["train_test"]["test"]  # Test set histogram color 
 HIST_ALPHA = _colors["train_test"]["alpha"]  # Transparency for compare histograms
 
-# Background colors for all plots
-HISTOGRAM_BG_COLOR = _colors["regression"]["background"]  # Background color for regression histogram plots
-CLASSIFICATION_BAR_BG_COLOR = _colors["classification"]["background"]  # Background color for classification bar charts
-DENSITY_PLOT_BG_COLOR = _colors["density"]["background"]  # Background color for density plots
-CORRELATION_BAR_BG = _colors["correlation"]["background"]  # Background color for correlation bar plots
-FEATURE_IMPORTANCE_BAR_BG = _colors["feature_importance"]["background"]  # Background color for feature importance plots
-SHAP_BG_COLOR = _colors["shap"]["background"]  # Background color for SHAP plots
+# Global background color for all plots
+BG_COLOR = _colors.get("background", "#FFFFFF")  # Global background color
+
+# Use global background color for all plot types
+HISTOGRAM_BG_COLOR = BG_COLOR
+CLASSIFICATION_BAR_BG_COLOR = BG_COLOR
+DENSITY_PLOT_BG_COLOR = BG_COLOR
+FEATURE_IMPORTANCE_BAR_BG = BG_COLOR
+SHAP_BG_COLOR = BG_COLOR
 
 # Feature importance colors
 FEATURE_IMPORTANCE_BAR_COLOR = _colors["feature_importance"]["bar"]  # Color for feature importance bars
@@ -285,12 +252,9 @@ SHAP_NEGATIVE_COLOR = _colors["shap"]["negative"]  # Color for negative SHAP val
 SHAP_TOP_N_FEATURES = 15  # Default number of top features to display in SHAP visualizations
 
 # SHAP interaction network colors
-SHAP_NETWORK_NODE_COLOR = _colors["shap"]["interactions"]["network_node_color"]  # Node color for network plot
-SHAP_NETWORK_EDGE_COLOR = _colors["shap"]["interactions"]["network_edge_color"]  # Edge color for network plot
-SHAP_NETWORK_LINK_COLOR = _colors["shap"]["interactions"]["link_color"]  # Link color for network plot
-TOP_BOTTOM_POSITIVE_COLOR = _colors["shap"]["positive"]  # Positive impact color for top-bottom network
-TOP_BOTTOM_NEGATIVE_COLOR = _colors["shap"]["negative"]  # Negative impact color for top-bottom network
-SHAP_NETWORK_EDGE_COLOR_DEFAULT = _colors["shap"]["interactions"]["network_edge_color"]  # Default edge color
+# Network visualization colors
+SHAP_NETWORK_NODE_CMAP = _colors["shap"]["interactions"]["network_node_cmap"]  # Colormap for network nodes based on SHAP values
+SHAP_NETWORK_EDGE_COLOR = _colors["shap"]["interactions"]["network_edge_color"]  # Edge color for all network plots
 
 # Density plot colors (previously hardcoded in predictions.py)
 DENSITY_ACTUAL_COLOR = _colors["density"]["actual"]  # Color for actual values in density plots
@@ -302,9 +266,7 @@ CONFUSION_MATRIX_CMAP = _colors["confusion_matrix"]["cmap"]  # Default colormap 
 CONFUSION_MATRIX_LINEWIDTH = _colors["confusion_matrix"]["linewidth"]  # Line width for confusion matrix grid
 CONFUSION_MATRIX_LINECOLOR = _colors["confusion_matrix"]["linecolor"]  # Line color for confusion matrix grid
 
-# Correlation plot colors
-# Use get_correlation_cmap function instead
-CORRELATION_CMAP = get_correlation_cmap()  # Colormap for correlation plots
+
 
 # ============================================================================
 # Color Visualization and CLI Utilities
@@ -507,8 +469,8 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create figure for color swatches
-    plt.figure(figsize=(12, 16))
+    # Create figure for color swatches with global background color
+    plt.figure(figsize=(12, 16), facecolor=BG_COLOR)
     plt.suptitle("DAFTAR-ML Color Palette", fontsize=16, y=0.99)
     plt.subplots_adjust(hspace=0.5)
     
@@ -517,7 +479,7 @@ def main():
     
     # 1. Binary Classification Colors
     ax1 = plt.subplot(n_rows, 2, 1)
-    plot_color_swatches(BINARY_CLASSIFICATION_COLORS, "Binary Classification Colors", ax1)
+    plot_color_swatches(BINARY_CLASSIFICATION_COLORS, "Two-State Classification Colors", ax1)
     
     # 2. Multiclass Classification Colors
     ax2 = plt.subplot(n_rows, 2, 2)
@@ -525,8 +487,8 @@ def main():
     
     # 3. Regression Colors
     ax3 = plt.subplot(n_rows, 2, 3)
-    plot_color_swatches([REGRESSION_COLOR, REGRESSION_MEAN_LINE_COLOR], 
-                      "Regression Colors", ax3, 
+    plot_color_swatches([REGRESSION_CV_COLOR, REGRESSION_CV_MEAN_LINE_COLOR], 
+                       "CV Regression Colors (Histogram/Mean Line)", ax3, 
                       alphas=[1.0, 1.0])
     
     # 4. Train/Test Colors
@@ -539,70 +501,43 @@ def main():
     ax5 = plt.subplot(n_rows, 2, 5)
     plot_color_swatches([FEATURE_IMPORTANCE_BAR_COLOR], 
                        "Feature Importance Bar", ax5, 
-                       background_color=FEATURE_IMPORTANCE_BAR_BG)
+                       background_color=BG_COLOR)
     
     # 6. SHAP Colors
     ax6 = plt.subplot(n_rows, 2, 6)
     plot_color_swatches([SHAP_POSITIVE_COLOR, SHAP_NEGATIVE_COLOR], 
                        "SHAP Colors (Positive/Negative)", ax6, 
-                       background_color=SHAP_BG_COLOR)
+                       background_color=BG_COLOR)
     
     # 7. Density Plot Colors
     ax7 = plt.subplot(n_rows, 2, 7)
     plot_color_swatches([DENSITY_ACTUAL_COLOR, DENSITY_PREDICTED_COLOR], 
                        "Density Plot (Actual/Predicted)", ax7, 
                        alphas=[DENSITY_ALPHA, DENSITY_ALPHA], 
-                       background_color=DENSITY_PLOT_BG_COLOR)
+                       background_color=BG_COLOR)
     
-    # 8. SHAP Network Colors
+    # 8. SHAP Network Colors and Colormap
     ax8 = plt.subplot(n_rows, 2, 8)
-    plot_color_swatches([SHAP_NETWORK_NODE_COLOR, SHAP_NETWORK_EDGE_COLOR, SHAP_NETWORK_LINK_COLOR], 
-                       "SHAP Network Colors (Node/Edge/Link)", ax8)
+    # Network edge color
+    plot_color_swatches([SHAP_NETWORK_EDGE_COLOR], 
+                       "Network Edge Color", ax8, background_color=BG_COLOR)
     
-    # 9. Confusion Matrix Colormap
+    # 8b. Network Node Colormap for all network visualizations
+    ax8b = plt.subplot(n_rows, 2, 10)
+    plot_colormap_gradient(SHAP_NETWORK_NODE_CMAP, f"Network Node Colormap ({SHAP_NETWORK_NODE_CMAP})", ax8b)
+    
+    # 9. Confusion Matrix Colormap with scale
     ax9 = plt.subplot(n_rows, 2, 9)
-    plot_colormap_gradient(CONFUSION_MATRIX_CMAP, "Confusion Matrix Colormap", ax9)
+    plot_colormap_gradient(CONFUSION_MATRIX_CMAP, f"Confusion Matrix ({CONFUSION_MATRIX_CMAP})", ax9)
     
-    # 10. Correlation Colormap
-    ax10 = plt.subplot(n_rows, 2, 10)
-    plot_colormap_gradient(CORRELATION_CMAP, "Correlation Colormap", ax10)
-    
-    # 11. Background Colors
+    # Add interaction heatmap colorscale (viridis)
     ax11 = plt.subplot(n_rows, 2, 11)
-    plot_color_swatches([
-        HISTOGRAM_BG_COLOR, 
-        CLASSIFICATION_BAR_BG_COLOR,
-        DENSITY_PLOT_BG_COLOR,
-        CORRELATION_BAR_BG,
-        FEATURE_IMPORTANCE_BAR_BG,
-        SHAP_BG_COLOR
-    ], "Background Colors", ax11)
+    plot_colormap_gradient("viridis", "Interaction Heatmap (viridis)", ax11)
     
-    # 12. Top-Bottom Network Colors
-    ax12 = plt.subplot(n_rows, 2, 12)
-    plot_color_swatches([
-        TOP_BOTTOM_POSITIVE_COLOR,
-        TOP_BOTTOM_NEGATIVE_COLOR
-    ], "Top-Bottom Network Colors (Pos/Neg)", ax12)
-    
-    # 13. Per-Class SHAP Colors
-    ax13 = plt.subplot(n_rows, 2, 13)
-    per_class_colors = get_per_class_shap_colors()
-    plot_color_swatches([
-        per_class_colors["positive"],
-        per_class_colors["negative"]
-    ], "Per-Class SHAP Colors (Pos/Neg)", ax13)
-    
-    # 14. Per-Class SHAP Class Colors
-    ax14 = plt.subplot(n_rows, 2, 14)
-    plot_color_swatches(
-        per_class_colors["class_colors"],
-        "Per-Class SHAP Class Colors", ax14
-    )
     
     # Save the figure
     output_path = output_dir / "daftar_colors.png"
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Color palette saved to: {output_path}")
     
     # Show color configuration path
@@ -619,3 +554,57 @@ def run_main():
 # Run the main function if called directly
 if __name__ == "__main__":
     main()
+
+
+# ============================================================================
+# Utility functions for visualization
+# ============================================================================
+
+def format_with_superscripts(number):
+    """Format numbers with proper superscripts for scientific notation.
+    
+    Example: 1.23e-05 becomes 1.23×10⁻⁵
+    
+    Args:
+        number: The number to format
+        
+    Returns:
+        Formatted string with proper superscripts
+    """
+    # Superscript mapping for clean display
+    superscript_map = {
+        '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+        '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+        '-': '⁻'
+    }
+    
+    # Handle zero case
+    if number == 0:
+        return "0.0000"
+        
+    # For very small numbers, use scientific notation with clean exponents
+    if abs(number) < 0.001 and abs(number) > 0:
+        # Format to scientific notation
+        str_val = f"{number:.2e}"
+        base, exponent = str_val.split('e')
+        
+        # Clean up the base (use 3 significant digits)
+        base = f"{float(base):.2f}"
+        
+        # Clean up the exponent (remove leading zeros)
+        # Strip the sign first
+        sign = '-' if exponent.startswith('-') else '+'
+        digits = exponent[1:].lstrip('0')
+        # Handle case where the exponent was all zeros
+        if not digits:
+            digits = '0'
+            
+        # Create the clean exponent with sign
+        clean_exponent = sign + digits
+        
+        # Convert exponent digits to superscripts
+        superscript_exp = ''.join(superscript_map.get(c, c) for c in clean_exponent)
+        return f"{base}×10{superscript_exp}"
+    else:
+        # For regular numbers, use standard formatting (3 decimal places)
+        return f"{number:.3f}"

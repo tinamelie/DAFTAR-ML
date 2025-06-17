@@ -13,14 +13,15 @@ import matplotlib.pyplot as plt
 import shap
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
+from daftar.viz.common import save_plot
 from daftar.viz.colors import (
     SHAP_POSITIVE_COLOR,
     SHAP_NEGATIVE_COLOR,
     SHAP_BG_COLOR,
-    CORRELATION_CMAP,
-    SHAP_TOP_N_FEATURES
+    SHAP_TOP_N_FEATURES,
+    format_with_superscripts
 )
-from daftar.viz.feature_explanation import save_top_features_summary
+from daftar.utils.file_utils import save_figures_explanation
 
 # SHAP visualization and analysis utilities
 
@@ -70,197 +71,84 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # SHAP_TOP_N_FEATURES is imported at the top of the file
     if top_n is None:
         top_n = SHAP_TOP_N_FEATURES
-    # Analyze feature impacts using SHAP values
-    print(f"Starting {prefix} SHAP analysis with focus on positive and negative impact...")
     
-    # Interactions are now computed and saved at the fold level during pipeline execution.
-    # Disable redundant (and memory-heavy) interaction computation here.
-    if False:  # previously: if problem_type == "regression":
-        print("Calculating SHAP interactions for all folds...")
-        successful_interactions = 0
-
-        # Process each fold separately
-        for i, fold in enumerate(fold_results, 1):
-            # Check for SHAP data
-            if 'shap_data' not in fold or not fold['shap_data']:
-                print(f"Skipping fold {i}: missing SHAP data")
-                continue
-                
-            # Get or load the model
-            model = None
-            if 'model' in fold and fold['model'] is not None:
-                model = fold['model']
-                print(f"Using in-memory model for fold {i}")
-            else:
-                # Try to load model from disk
-                import joblib
-                model_path = Path(main_output_dir) / f"fold_{i}" / f"best_model_fold_{i}.pkl"
-                try:
-                    model = joblib.load(model_path)
-                    print(f"Successfully loaded model from {model_path}")
-                except Exception as e:
-                    print(f"Error loading model for fold {i}: {str(e)}")
-                    continue
-                    
-            if model is None:
-                print(f"Skipping fold {i}: couldn't get a valid model")
-                continue
-                
-            # Get test data (model already loaded above)
-            X_test = fold.get('X_test')
-            
-            # If X_test is missing, try to get it from shap_data
-            if X_test is None and len(fold['shap_data']) > 1:
-                X_test = fold['shap_data'][1]
-                
-            # Skip if no test data
-            if X_test is None:
-                print(f"Skipping fold {i}: missing X_test data")
-                continue
-                
-            # Get SHAP values and feature names
-            shap_values = fold['shap_data'][0]
-            
-            # Get feature names - try multiple sources
-            feature_names = None
-            
-            # Source 1: Check if X_test is already a DataFrame with column names
-            if isinstance(X_test, pd.DataFrame):
-                feature_names = list(X_test.columns)
-                print(f"Using feature names from X_test DataFrame for fold {i}")
-            
-            # Source 2: Check if feature_names are explicitly stored in fold
-            elif fold.get('feature_names') is not None:
-                feature_names = fold.get('feature_names')
-                print(f"Using feature_names from fold data for fold {i}")
-            
-            # Source 3: Extract from SHAP data - this is most reliable
-            elif 'shap_data' in fold and len(fold['shap_data']) > 1:
-                # If SHAP data has a DataFrame as second element
-                shap_df = fold['shap_data'][1]
-                if isinstance(shap_df, pd.DataFrame):
-                    feature_names = list(shap_df.columns)
-                    print(f"Using feature names from SHAP data DataFrame for fold {i}")
-                # If not a DataFrame but we have X_test numpy array, try to create feature names
-                elif hasattr(X_test, 'shape') and hasattr(fold['shap_data'][0], 'shape'):
-                    # Match X_test with SHAP values shape
-                    num_features = fold['shap_data'][0].shape[1] if fold['shap_data'][0].ndim > 1 else X_test.shape[1]
-                    # Get feature names from existing CSV files
-                    fold_dir = Path(main_output_dir) / f"fold_{i}"
-                    try:
-                        # Try to load feature names from feature importance file
-                        fi_file = fold_dir / f"feature_importance_fold_{i}.csv"
-                        if fi_file.exists():
-                            fi_df = pd.read_csv(fi_file)
-                            if 'Feature' in fi_df.columns:
-                                feature_names = fi_df['Feature'].tolist()
-                                print(f"Loaded {len(feature_names)} feature names from feature importance file for fold {i}")
-                    except Exception as e:
-                        print(f"Error loading feature names from CSV for fold {i}: {str(e)}")
-            
-            # Convert X_test to DataFrame if we have feature names
-            if feature_names:
-                if not isinstance(X_test, pd.DataFrame):
-                    X_test = pd.DataFrame(X_test, columns=feature_names)
-            else:
-                print(f"Skipping fold {i}: could not find feature names from any source")
-                continue
-                    
-            # Get top features for this fold based on SHAP values
-            # Use 4*top_n to ensure coverage of both positive and negative features
-            max_features = 4 * top_n
-            
-            # Calculate mean absolute SHAP values and get top indices
-            mean_abs_shap = np.abs(shap_values).mean(axis=0)
-            top_indices = np.argsort(-mean_abs_shap)[:max_features]
-            top_features = [feature_names[i] for i in top_indices]
-            
-            # Filter X_test to only include top features to speed up interaction calculation
-            X_filtered = X_test[top_features]
-            
-            print(f"Calculating interactions for fold {i} using top {len(top_features)} features...")
-            
-            try:
-                # Create fold directory if it doesn't exist
-                fold_dir = Path(main_output_dir) / f"fold_{i}"
-                fold_dir.mkdir(exist_ok=True)
-                
-                # Extract the underlying model if needed
-                if hasattr(model, 'model'):
-                    underlying_model = model.model
-                else:
-                    underlying_model = model
-                    
-                # For XGBoost models, extract the booster
-                if 'xgboost' in str(type(underlying_model)).lower() and hasattr(underlying_model, 'get_booster'):
-                    underlying_model = underlying_model.get_booster()
-                
-                # Calculate SHAP interactions
-                explainer = shap.TreeExplainer(underlying_model)
-                interaction_values = explainer.shap_interaction_values(X_filtered)
-                
-                # If interaction_values is a list (for multi-output models), use the first element
-                if isinstance(interaction_values, list):
-                    interaction_values = interaction_values[0]
-                    
-                # Average across samples to get feature-feature interactions
-                interaction_matrix = np.mean(np.abs(interaction_values), axis=0)
-                
-                # Create tidy DataFrame with feature1, feature2, interaction_strength
-                interactions = []
-                for i1, f1 in enumerate(top_features):
-                    for i2, f2 in enumerate(top_features):
-                        if i1 <= i2:  # Include diagonal and upper triangle
-                            strength = interaction_matrix[i1, i2]
-                            interactions.append({"feature1": f1, "feature2": f2, "interaction_strength": strength})
-                
-                interaction_df = pd.DataFrame(interactions)
-                
-                # Save to CSV
-                csv_path = fold_dir / f"fold_{i}_interactions.csv"
-                interaction_df.to_csv(csv_path, index=False)
-                
-                print(f"Successfully saved interactions for fold {i} to {csv_path}")
-                successful_interactions += 1
-                
-            except Exception as e:
-                print(f"Error calculating interactions for fold {i}: {str(e)}")
-        
-        # Verify that at least one fold had successful interactions
-        if successful_interactions == 0:
-            print("WARNING: No fold interactions were successfully calculated. Network visualizations will fail.")
-            print("Check for model compatibility with SHAP interactions.")
-        else:
-            print(f"Successfully calculated interactions for {successful_interactions} fold(s).")
-
     # Define custom linear colormap
     # Create color map with centralized colors (blue to white to red)
     colors = [SHAP_NEGATIVE_COLOR, SHAP_BG_COLOR, SHAP_POSITIVE_COLOR]
     feature_cmap = LinearSegmentedColormap.from_list("feature_cmap", colors)
 
-    # Combine SHAP results from all folds
-    shap_values_list = [fold['shap_data'][0] for fold in fold_results]
-    X_test_list = [fold['shap_data'][1] for fold in fold_results]
-    
     # Handle different SHAP structures for classification vs regression
     # For binary classification, shap_values often have shape (samples, features, 2)
     # For regression, they have shape (samples, features)
     is_classification = problem_type == "classification"
     
     # -------------------------------------------------------------------------
-    # === Build per‑fold mean SHAP matrix =====================================
+    # === Build per‑fold mean SHAP matrix with proper feature handling =======
     # -------------------------------------------------------------------------
-    # For each fold, calculate the mean SHAP value for each feature
-    # This creates a matrix of (n_folds x n_features)
-    per_fold_means = []
-    for fold in fold_results:
+    # Track which features are present in which folds to avoid penalizing absence
+    all_features = set()
+    fold_feature_means = {}  # fold_idx -> {feature_name -> mean_shap_value}
+    
+    # First pass: collect all unique features across all folds
+    for fold_idx, fold in enumerate(fold_results):
+        fold_X = fold['shap_data'][1]
+        all_features.update(fold_X.columns)
+    
+    # Convert to sorted list for consistent ordering
+    all_features = sorted(list(all_features))
+    
+    # Second pass: calculate mean SHAP values per fold, handling missing features properly
+    for fold_idx, fold in enumerate(fold_results):
         fold_shap_values = fold['shap_data'][0]
+        fold_X = fold['shap_data'][1]
+        
         # For classification with class dimension, take class 1 (positive class)
         if is_classification and len(fold_shap_values.shape) > 2:
             fold_shap_values = fold_shap_values[:, :, 1]  # Use positive class (index 1)
-        fold_mean = fold_shap_values.mean(axis=0)  # mean per feature in THIS fold
-        per_fold_means.append(fold_mean)
-    per_fold_means = np.vstack(per_fold_means)  # shape: (n_folds, n_features)
+        
+        # Calculate mean SHAP value for each feature in this fold
+        fold_means = {}
+        for feature_idx, feature_name in enumerate(fold_X.columns):
+            fold_means[feature_name] = fold_shap_values[:, feature_idx].mean()
+        
+        # For features not present in this fold, we don't record a value
+        # (rather than recording 0, which would unfairly penalize the feature)
+        fold_feature_means[fold_idx] = fold_means
+    
+    # Calculate statistics across folds, only using folds where each feature is present
+    feature_statistics = {}
+    
+    for feature in all_features:
+        # Collect mean SHAP values from folds where this feature is present
+        feature_values = []
+        for fold_idx in range(len(fold_results)):
+            if feature in fold_feature_means[fold_idx]:
+                feature_values.append(fold_feature_means[fold_idx][feature])
+        
+        if len(feature_values) > 0:
+            # Calculate statistics only from folds where feature is present
+            mean_shap = np.mean(feature_values)
+            std_across = np.std(feature_values, ddof=1) if len(feature_values) > 1 else 0.0
+            
+            # Calculate fold consistency (direction agreement across folds)
+            signs = np.sign(feature_values)
+            global_sign = np.sign(mean_shap)
+            direction_consistency = np.sum(signs == global_sign) / len(signs) if len(signs) > 0 else 0.0
+            
+            feature_statistics[feature] = {
+                'Mean_SHAP': mean_shap,
+                'Magnitude': np.abs(mean_shap),  # Keep it simple - magnitude = absolute value
+                'SHAP_StdDev': std_across,
+                'Direction_Consistency': direction_consistency,
+                'Direction': "Positive" if mean_shap > 0 else "Negative" if mean_shap < 0 else "Neutral"
+            }
+    
+    # Create DataFrame from feature statistics
+    shap_values_df = pd.DataFrame.from_dict(feature_statistics, orient='index')
+    
+    # Combine SHAP results from all folds for visualization
+    shap_values_list = [fold['shap_data'][0] for fold in fold_results]
+    X_test_list = [fold['shap_data'][1] for fold in fold_results]
     
     # Process the overall SHAP values for visualizations
     # For classification, handle the extra dimension
@@ -272,84 +160,21 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     
     overall_X_test = pd.concat(X_test_list)
 
-    # Calculate statistics across folds
-    mean_signed = per_fold_means.mean(axis=0)              # global mean SHAP value (signed) for each feature
-    std_across = per_fold_means.std(axis=0, ddof=1)       # across‑fold standard deviation of mean SHAP
+    # Features are sorted by magnitude in the dataframe
     
-    # Analyze consistency of feature impact direction across folds
-    sign_matrix = np.sign(per_fold_means)                  # Sign (+/-) of impact in each fold
-    global_sign = np.sign(mean_signed)                     # Overall sign of impact
-    # Fold_consistency measures how often a feature has the same directional impact 
-    # across different folds (1.0 = perfectly consistent direction)
-    fold_consistency = (sign_matrix == global_sign).sum(axis=0) / sign_matrix.shape[0]
-
-    # Calculate fold-level metrics
-    shap_signed_df = pd.DataFrame({
-        "Fold_Mean_SHAP": mean_signed,
-        "Fold_SHAP_StdDev": std_across,
-        "Fold_Impact_Direction": ["Positive" if v > 0 else "Negative" if v < 0 else "Neutral"
-                            for v in mean_signed],
-    }, index=overall_X_test.columns)
-
     # ----------------------------
-    # FOLD-LEVEL: Global beeswarm based on fold-aggregated values
-    # This uses the mean SHAP values calculated per fold first
-    # Features are ranked by their mean absolute SHAP value across folds
+    # Global beeswarm based on fold-aggregated values
+    # Features are ranked by their magnitude across folds where they're present
     # ----------------------------
-    print("Creating fold-level SHAP beeswarm plot...")
     
-    # Create modified fold-level analysis that doesn't penalize absent features
-    # We'll track which features are present in which folds
-    feature_counts = {}
-    fold_means_dict = {}
-    
-    # Process each fold individually
-    for i, fold in enumerate(fold_results):
-        fold_shap_values = fold['shap_data'][0]
-        fold_X = fold['shap_data'][1]
-        
-        # For classification, handle the extra dimension
-        if is_classification and len(fold_shap_values.shape) > 2:
-            fold_shap_values = fold_shap_values[:, :, 1]  # Use positive class
-            
-        # Process each feature in this fold
-        for j, feature in enumerate(fold_X.columns):
-            if feature not in feature_counts:
-                feature_counts[feature] = 0
-                fold_means_dict[feature] = []
-                
-            # Record that this feature was present in this fold
-            feature_counts[feature] += 1
-            
-            # Store the mean SHAP value for this feature in this fold
-            fold_means_dict[feature].append(fold_shap_values[:, j].mean())
-    
-    # Calculate the fold-level average importance (only for folds where feature exists)
-    fold_level_impact = {}
-    for feature, means in fold_means_dict.items():
-        if means:  # Only if we have data for this feature
-            fold_level_impact[feature] = np.mean(np.abs(means))
-    
-    # Create a DataFrame with fold-level impact
-    fold_level_importance_df = pd.DataFrame({
-        "Fold_Level_Impact": fold_level_impact
-    })
-    
-    # Add the fold-level impact to the main dataframe
-    for feature in shap_signed_df.index:
-        if feature in fold_level_importance_df.index:
-            shap_signed_df.loc[feature, "Fold_Level_Impact"] = fold_level_importance_df.loc[feature, "Fold_Level_Impact"]
-        else:
-            shap_signed_df.loc[feature, "Fold_Level_Impact"] = 0
-    
-    # Sample-level impact references removed
-    
-    # Create fold-level beeswarm plot using fold-aggregated data
+    # Create beeswarm plot using fold-aggregated data
     plt.figure(figsize=(12, 8))
-    plt.title("Fold-Level SHAP Beeswarm (Features Ranked by Cross-Fold Consistency)")
     
-    # Create a sorted index based on fold-level impact
-    sorted_features = fold_level_importance_df.sort_values('Fold_Level_Impact', ascending=False).index.tolist()
+    # Show top N features in the title, using min to handle case where top_n is None or exceeds available features
+    n_features = min(top_n or len(shap_values_df), len(shap_values_df))
+    
+    # Create a sorted index based on Magnitude
+    sorted_features = shap_values_df.sort_values('Magnitude', ascending=False).index.tolist()
     
     # Use this to reorder the overall matrices (only way to control feature order in beeswarm plot)
     reordered_columns = [col for col in sorted_features if col in overall_X_test.columns]
@@ -364,36 +189,38 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     # Use top_n parameter to control number of features shown
     shap.summary_plot(reordered_shap, reordered_X,
                      show=False, plot_type="dot", color_bar=True,
-                     max_display=top_n, sort=False)  # Disable auto-sort to keep fold-level ranking
+                     max_display=top_n, sort=False)  # Disable auto-sort to maintain our custom ranking
     
-    plt.savefig(os.path.join(main_output_dir, "shap_beeswarm_impact.png"),
-                bbox_inches="tight")
-    plt.close()
+    # Add title after generating the plot to ensure it's not overwritten
+    plt.title(f"SHAP Values Across All Folds (Top {n_features} Features by SHAP Magnitude)", 
+              pad=20, fontsize=14, y=1.05)
+    plt.tight_layout()
+    
+    # Save the figure with title
+    fig = plt.gcf()
+    save_plot(fig, os.path.join(main_output_dir, "top_shap_beeswarm_plot.png"), tight_layout=False)
 
-    # Sample-level bar plot code removed
-    # Define variables needed for fold-level visualizations
+    # Define variables needed for visualizations
     pos_color = SHAP_POSITIVE_COLOR
     neg_color = SHAP_NEGATIVE_COLOR
-    cap_width = 0.2  # Used in fold-level error bars
+    cap_width = 0.2  # Width of error bar caps in the SHAP bar plot
 
     # -------------------------------------------------------------------------
-    # FOLD LEVEL - Bar plot of top features by fold-level consistency
+    # Bar plot of top features by SHAP values
     # -------------------------------------------------------------------------
-    print("Generating fold-level SHAP bar plot with cross-validation whiskers...")
-
-    # Get features with highest fold-level impact 
-    fold_df = shap_signed_df.copy()
+    # Get features with their mean SHAP values across all folds
+    fold_df = shap_values_df.copy()
     
-    # Sort by fold-level impact (not presence!) and separate positive/negative
-    neg_fold = fold_df[fold_df["Fold_Mean_SHAP"] < 0].copy()
+    # Sort by shap value and separate positive/negative
+    neg_fold = fold_df[fold_df["Mean_SHAP"] < 0].copy()
     # Sort negative features by raw value (most negative first)
-    neg_fold = neg_fold.sort_values("Fold_Mean_SHAP", ascending=True).head(top_n)
+    neg_fold = neg_fold.sort_values("Mean_SHAP", ascending=True).head(top_n)
     # Reverse the order so the least negative is first
     neg_fold = neg_fold.iloc[::-1]
 
-    pos_fold = fold_df[fold_df["Fold_Mean_SHAP"] > 0].copy()
+    pos_fold = fold_df[fold_df["Mean_SHAP"] > 0].copy()
     # Sort positive features by raw value (largest positive first)
-    pos_fold = pos_fold.sort_values("Fold_Mean_SHAP", ascending=False).head(top_n)
+    pos_fold = pos_fold.sort_values("Mean_SHAP", ascending=False).head(top_n)
     
     # Create the dataframe with positives on top and negatives on bottom
     bar_fold_df = pd.concat([pos_fold, neg_fold])
@@ -410,15 +237,15 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
 
     # Draw error bars with caps to show cross-fold variation
     for y, (_, row) in zip(ys, bar_fold_df.iterrows()):
-        v = row["Fold_Mean_SHAP"]
-        e = row["Fold_SHAP_StdDev"]
+        v = row["Mean_SHAP"]
+        e = row["SHAP_StdDev"]
         ax.plot([v - e, v + e], [y, y], color="black", lw=1, alpha=0.7, zorder=1)
         ax.vlines([v - e, v + e], y - cap_width, y + cap_width,
                   colors="black", lw=1, alpha=0.7, zorder=1)
 
     # Use colors that match the legend - positive and negative values from color_definitions
-    colors = [pos_color if x > 0 else neg_color for x in bar_fold_df["Fold_Mean_SHAP"]]
-    ax.barh(ys, bar_fold_df["Fold_Mean_SHAP"], height=0.7, color=colors, alpha=1, zorder=2)
+    colors = [pos_color if x > 0 else neg_color for x in bar_fold_df["Mean_SHAP"]]
+    ax.barh(ys, bar_fold_df["Mean_SHAP"], height=0.7, color=colors, alpha=1, zorder=2)
 
     # Set feature names as y-axis labels
     ax.set_yticks(ys)
@@ -433,11 +260,12 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
 
     # Label each bar with its value
     xmin, xmax = ax.get_xlim()
-    epsilon = (xmax - xmin) * 0.01
+    x_range = xmax - xmin
+    epsilon = (x_range) * 0.03  # Increased spacing from whiskers
     for y, (_, row) in zip(ys, bar_fold_df.iterrows()):
-        v = row["Fold_Mean_SHAP"]
-        e = row["Fold_SHAP_StdDev"]
-        label = format_scientific(v, cutoff=0.01, sig=4, sci_sig=1)
+        v = row["Mean_SHAP"]
+        e = row["SHAP_StdDev"]
+        label = format_with_superscripts(v)
         if v < 0:
             x_text = v - e - epsilon
             ha = "right"
@@ -446,22 +274,23 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
             ha = "left"
         ax.text(x_text, y, label,
                 va="center", ha=ha, fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.7, pad=1),
+                bbox=dict(facecolor="white", alpha=0.7, pad=1, edgecolor="gray", linewidth=0.5, boxstyle="round,pad=0.5", linestyle="-"),
                 zorder=3)
 
-    # Adjust x-axis limits to ensure labels fit
+    # Adjust x-axis limits to ensure labels fit with balanced padding
     xmin, xmax = ax.get_xlim()
-    ax.set_xlim(xmin*1.2, xmax*1.2)  # Add 20% padding on both sides
+    x_range = xmax - xmin
+    ax.set_xlim(xmin - 0.1 * x_range, xmax + 0.1 * x_range)  # 10% padding on both sides
 
     # Set labels and grid
-    ax.set_xlabel("SHAP Impact (Fold-Level)")
+    ax.set_xlabel("SHAP Value")
     ax.set_ylabel("Feature")
     
     # Update title to clearly indicate top/bottom features if both are present
     if len(neg_fold) > 0 and len(pos_fold) > 0:
-        ax.set_title(f"Fold-Level SHAP Impact (Top {min(top_n, len(pos_fold))} Positive & Top {min(top_n, len(neg_fold))} Negative Features)")
+        ax.set_title(f"SHAP Values (Top {min(top_n, len(pos_fold))} Positive & Top {min(top_n, len(neg_fold))} Negative Features)")
     else:
-        ax.set_title(f"Fold-Level SHAP Impact (Top {top_n} Features)")
+        ax.set_title(f"SHAP Values (Top {top_n} Features)")
     
     ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
     ax.grid(axis="y", visible=False)
@@ -478,105 +307,26 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
         Patch(facecolor=neg_color, label='Decreases prediction')
     ]
 
-    plt.tight_layout()
+    # Create space for the legend below the plot (with less vertical space)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
     
-    # Move legend to the bottom left corner as requested
-    ax.legend(handles=legend_elements, loc='lower left', 
-              frameon=True, fontsize=9, framealpha=0.9)
+    # Add legend below the plot
+    ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.08),
+              ncol=2, frameon=True, fontsize=9, framealpha=0.9)
 
     # Save plot with informative filename
-    plt.savefig(os.path.join(main_output_dir, "shap_bar_pos_neg_impact.png"),
-                bbox_inches="tight", pad_inches=0.1)
-    plt.close()
+    fig = plt.gcf()
+    save_plot(fig, os.path.join(main_output_dir, "top_shap_bar_pos_neg.png"), tight_layout=False)
     
     # Create an additional bar plot sorted by absolute SHAP value
-    # We need to pass fold_level_importance_df to ensure consistent feature selection with beeswarm plot
-    create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_output_dir, pos_color, neg_color, top_n)
-    # Calculate correlation between SHAP values and feature values
-    fold_level_corrs = {}
+    create_absolute_sorted_bar_plot(fold_df, main_output_dir, pos_color, neg_color, top_n)
     
-    if problem_type == "classification":
-        # Set correlations to 0 for classification - not meaningful in this context
-        for feature in overall_X_test.columns:
-            fold_level_corrs[feature] = 0
-    else:
-        # Calculate fold-level correlations for regression
-        for feature in overall_X_test.columns:
-            feature_corrs = []
-            for fold in fold_results:
-                shap_vals, X_f, y_f = fold['shap_data']
-                if feature in X_f.columns:
-                    col_idx = X_f.columns.get_loc(feature)
-                    # Safely calculate correlation with error handling
-                    try:
-                        # Handle divide by zero warnings
-                        with np.errstate(divide='ignore', invalid='ignore'):
-                            corr = np.corrcoef(shap_vals[:, col_idx], y_f)[0, 1]
-                            if np.isnan(corr):
-                                corr = 0
-                    except:
-                        corr = 0
-                    
-                    feature_corrs.append(corr)
-            
-            # Store the average correlation for this feature
-            fold_level_corrs[feature] = np.mean(feature_corrs) if feature_corrs else 0
-            
-    # Add correlation columns to main dataframe - only for regression problems
-    if problem_type != "classification":
-        shap_signed_df["Fold_Level_Correlation"] = pd.Series(fold_level_corrs)
-    
-    # Add fold-level rank columns only
-    # Removed ranking columns as requested
-
-    # -------------------------------------------------------------------------
-    # Generate correlation plots for regression problems
-    # -------------------------------------------------------------------------
-    if problem_type == "regression":
-        
-        # Only fold-level correlation plots are used
-        
-        # Fold-level correlation plot
-        corr_fold_df = shap_signed_df.sort_values("Fold_Level_Correlation", key=abs, ascending=False).head(25)
-        fig, ax = plt.subplots(figsize=(10, max(6, len(corr_fold_df) * 0.2)))
-        
-        # Create the colors based on fold-level correlations
-        colors_fold = [pos_color if x > 0 else neg_color for x in corr_fold_df["Fold_Level_Correlation"]]
-        
-        # Draw bars
-        ax.barh(range(len(corr_fold_df)), corr_fold_df["Fold_Level_Correlation"], color=colors_fold)
-        ax.set_yticks(range(len(corr_fold_df)))
-        ax.set_yticklabels(corr_fold_df.index)
-        ax.axvline(0, color="black", linestyle="-", linewidth=0.5)
-        ax.set_xlabel("Correlation between SHAP values and target")
-        ax.set_title("Features by SHAP-Target Correlation (Fold Level)")
-        
-        # Add error bars for standard deviation
-        for i, (feat, row) in enumerate(corr_fold_df.iterrows()):
-            std = row.get("Fold_SHAP_StdDev", 0)
-            ax.plot([row["Fold_Level_Correlation"] - std, row["Fold_Level_Correlation"] + std], 
-                   [i, i], color="black", linewidth=1, zorder=3)
-            ax.plot([row["Fold_Level_Correlation"] - std, row["Fold_Level_Correlation"] - std], 
-                   [i - 0.2, i + 0.2], color="black", linewidth=1, zorder=3)
-            ax.plot([row["Fold_Level_Correlation"] + std, row["Fold_Level_Correlation"] + std], 
-                   [i - 0.2, i + 0.2], color="black", linewidth=1, zorder=3)
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(main_output_dir, "shap_corr_bar_fold.png"), 
-                   bbox_inches="tight")
-        plt.close()
-        # Removed excessive success message
 
     # -------------------------------------------------------------------------
     # Save detailed CSV
     # -------------------------------------------------------------------------
-    # For classification problems, remove the correlation columns
-    output_df = shap_signed_df.copy()
-    
-    # For classification, drop correlation columns
-    if problem_type == "classification":
-        if "Fold_Level_Correlation" in output_df.columns:
-            output_df = output_df.drop(columns=["Fold_Level_Correlation"])
+    # Create output dataframe for CSV saving
+    output_df = shap_values_df.copy()
     
     # Organize columns: Group by measurement type
     cols = list(output_df.columns)
@@ -592,9 +342,16 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     reordered_cols = other_cols + fold_cols 
     output_df = output_df[reordered_cols]
     
-    print("Saving SHAP analysis to CSV...")
-    # Use output_df which has columns removed as needed
-    output_df.to_csv(os.path.join(main_output_dir, "shap_features_analysis.csv"), index_label="Feature")
+    output_df.to_csv(os.path.join(main_output_dir, "shap_means_overall.csv"), index_label="Feature")
+    
+    column_order = [
+        'Mean_SHAP', 'Magnitude', 'SHAP_StdDev', 'Direction_Consistency', 'Direction'
+    ]
+    # Add any additional columns that might exist
+    for col in shap_values_df.columns:
+        if col not in column_order:
+            column_order.append(col)
+    shap_values_df = shap_values_df[column_order]
     
     # Save the raw SHAP value matrix for all samples with proper IDs
     # First check if we have sample IDs in the fold results
@@ -629,210 +386,32 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     shap_df.insert(2, 'Target', target_values)
     
     # Save to comprehensive CSV (this will be the single source of truth)
-    shap_df.to_csv(os.path.join(main_output_dir, "shap_values_all_folds.csv"), index=False)
+    shap_df.to_csv(os.path.join(main_output_dir, "shap_raw_all_folds.csv"), index=False)
     
-    # Rankings content is now consolidated into shap_features_summary.txt (created by save_top_features_summary)
-    # We no longer generate a separate shap_feature_rankings.txt file
-    
-    # -------------------------------------------------------------------------
-    # Create correlation bar plots with enhanced visualization (for regression only)
-    # -------------------------------------------------------------------------
-    # Initialize correlation dataframe for both regression and classification
-    # For classification, it will remain empty
-    corr_df = pd.DataFrame(columns=['Correlation_With_Target'])
-    corr_df.index.name = 'Feature'
-    
-    if problem_type == "regression":
-        print("Creating SHAP‑target correlation plots...")
-        
-        # Create fold-level correlation DataFrame
-        corr_df = pd.DataFrame.from_dict(fold_level_corrs, orient='index', columns=['Correlation_With_Target'])
-        corr_df.index.name = 'Feature'
-        corr_df.sort_values('Correlation_With_Target', ascending=False, inplace=True)
-        
-        # Get top and bottom features by correlation for visualization
-        top_corr = corr_df.nlargest(top_n, "Correlation_With_Target")
-        bottom_corr = corr_df.nsmallest(top_n, "Correlation_With_Target")
-        corr_df_viz = pd.concat([top_corr, bottom_corr]).sort_values("Correlation_With_Target", ascending=False)
-        
-        # Create colormap for better visualization
-        vmax = corr_df_viz["Correlation_With_Target"].abs().max()
-        norm = plt.Normalize(-vmax, vmax)
-        colors = [feature_cmap(norm(v)) for v in corr_df_viz["Correlation_With_Target"]]
-        # Only save correlation CSV for regression tasks
-        if problem_type == "regression":
-            # Sample-level CSV removed
-            pass
-        
-        print("Creating SHAP‑target correlation plots...")
-        
-        # Get top and bottom features by correlation using the same data as the CSV
-        top_corr = corr_df.nlargest(top_n, "Correlation_With_Target")
-        bottom_corr = corr_df.nsmallest(top_n, "Correlation_With_Target")
-        corr_df_viz = pd.concat([top_corr, bottom_corr]).sort_values("Correlation_With_Target", ascending=False)
-        
-        # Create colormap for better visualization
-        vmax = corr_df_viz["Correlation_With_Target"].abs().max()
-        norm = plt.Normalize(-vmax, vmax)
-        colors = [feature_cmap(norm(v)) for v in corr_df_viz["Correlation_With_Target"]]
-        
-        # Create figure and plot
-        fig, axc = plt.subplots(figsize=(10, max(5, len(corr_df_viz) * 0.4)))
-        axc.set_title(f"SHAP‑Target Correlation (Sample-Level, Top {top_n} & Bottom {top_n})")
-        
-        sns.barplot(
-            x="Correlation_With_Target",
-            y=corr_df_viz.index,
-            data=corr_df_viz,
-            hue=corr_df_viz.index,
-            palette=colors,
-            legend=False,  # Hide the legend
-            ax=axc
-        )
-        
-        # Set appropriate axis limits with padding
-        pad = vmax * 0.15  # 15% of the largest absolute bar
-        if (corr_df_viz["Correlation_With_Target"] < 0).any():
-            axc.set_xlim(-vmax - pad, vmax + pad)
-        else:
-            axc.set_xlim(0, vmax + pad)
-        
-        axc.set_xlabel("Correlation")
-        axc.set_ylabel("Feature")
-        axc.grid(axis="x", ls="--", alpha=0.3)
-        
-        # Add value annotations on bars for fold-level
-        # Fix variable naming to use corr_df_viz instead of fold_corr_viz
-        # Calculate padding based on the data range
-        pad_fold = max(0.05, (vmax - (-vmax)) * 0.05)  # 5% of the data range
-        offset_fold = pad_fold * 0.25
-        for i, v in enumerate(corr_df_viz["Correlation_With_Target"]):
-            x_text = v + (offset_fold if v >= 0 else -offset_fold)
-            ha = "left" if v >= 0 else "right"
-            axc.text(x_text, i, f"{v:.3f}", va="center", ha=ha, fontsize=8)
-        
-        # Add styling elements for fold-level
-        axc.axvline(0, color="grey", ls="--", lw=1)
-        
-        # Save and close
-        fig.tight_layout()
-        fig.savefig(os.path.join(main_output_dir, f"shap_corr_bar_fold.png"), bbox_inches="tight")
-        plt.close(fig)
-    if len(fold_results) > 0:
-        # Try to calculate fold-level correlations
-        for fold in fold_results:
-            if 'shap_data' not in fold or fold['shap_data'] is None:
-                continue
-                
-            shap_vals, X_test, y_test = fold['shap_data']
-            if shap_vals is None or X_test is None or y_test is None:
-                continue
-                
-            # For each feature, calculate correlation between its SHAP values and target
-            for j, feature in enumerate(X_test.columns):
-                if j >= shap_vals.shape[1]:
-                    continue
-                    
-                # Calculate correlation for this feature in this fold
-                try:
-                    with np.errstate(divide='ignore', invalid='ignore'):
-                        corr = np.corrcoef(shap_vals[:, j], y_test)[0, 1]
-                        if np.isnan(corr):
-                            corr = 0
-                except:
-                    corr = 0
-                
-                # Individual feature correlations are already aggregated during the main fold-level correlation calculations
-        
-        # Create DataFrame from dict and sort by correlation value
-        fold_corr_df = pd.DataFrame.from_dict(fold_level_corrs, orient='index', columns=['Correlation_With_Target'])
-        fold_corr_df.index.name = 'Feature'
-        fold_corr_df.sort_values('Correlation_With_Target', ascending=False, inplace=True)
-        
-        # Only save correlation CSV for regression tasks
-        if problem_type == "regression":
-            fold_corr_df.to_csv(os.path.join(main_output_dir, f'shap_corr_fold.csv'))
-        
-        # Prepare fold-level correlation visualization
-        has_differences = True
-        
-        if problem_type == "regression":
-            # Get top and bottom features by correlation for fold-level
-            top_fold_corr = fold_corr_df.nlargest(top_n, "Correlation_With_Target")
-            bottom_fold_corr = fold_corr_df.nsmallest(top_n, "Correlation_With_Target")
-            fold_corr_viz = pd.concat([top_fold_corr, bottom_fold_corr]).sort_values("Correlation_With_Target", ascending=False)
-            
-            # Create colormap for better visualization
-            vmax_fold = fold_corr_viz["Correlation_With_Target"].abs().max()
-            norm_fold = plt.Normalize(-vmax_fold, vmax_fold)
-            colors_fold = [feature_cmap(norm_fold(v)) for v in fold_corr_viz["Correlation_With_Target"]]
-            
-            # Create figure and plot for fold-level
-            fig_fold, axf = plt.subplots(figsize=(10, max(5, len(fold_corr_viz) * 0.4)))
-            axf.set_title(f"SHAP‑Target Correlation (Fold-Level, Top {top_n} & Bottom {top_n})")
-            
-            # Create the bar plot for fold-level using seaborn
-            sns.barplot(
-                x="Correlation_With_Target",
-                y=fold_corr_viz.index,
-                data=fold_corr_viz,
-                hue=fold_corr_viz.index,
-                palette=colors_fold,
-                legend=False,  # Hide the legend
-                ax=axf
-            )
-            
-            # Set appropriate axis limits with padding for fold-level
-            pad_fold = vmax_fold * 0.15
-            if (fold_corr_viz["Correlation_With_Target"] < 0).any():
-                axf.set_xlim(-vmax_fold - pad_fold, vmax_fold + pad_fold)
-            else:
-                axf.set_xlim(0, vmax_fold + pad_fold)
-            
-            axf.set_xlabel("Correlation")
-            axf.set_ylabel("Feature")
-            axf.grid(axis="x", ls="--", alpha=0.3)
-            axf.grid(axis="y", visible=False)
-            
-            # Add value annotations on bars for fold-level
-            offset_fold = pad_fold * 0.25
-            for i, v in enumerate(fold_corr_viz["Correlation_With_Target"]):
-                x_text = v + (offset_fold if v >= 0 else -offset_fold)
-                ha = "left" if v >= 0 else "right"
-                axf.text(x_text, i, f"{v:.3f}", va="center", ha=ha, fontsize=8)
-            
-            # Add styling elements for fold-level
-            axf.axvline(0, color="grey", ls="--", lw=1)
-            
-            # Save and close
-            fig_fold.tight_layout()
-            fig_fold.savefig(os.path.join(main_output_dir, f"shap_corr_bar_fold.png"), bbox_inches="tight")
-            plt.close(fig_fold)
-    
-    # Make sure to return the dataframe so it can be used for summary generation
-    return shap_signed_df.copy()
 
-def create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_output_dir, pos_color, neg_color, top_n=None):
-    # Use default from color_definitions if not specified
-    # SHAP_TOP_N_FEATURES is imported at the top of the file
-    if top_n is None:
-        top_n = SHAP_TOP_N_FEATURES
+    # -------------------------------------------------------------------------
+
+    # Make sure to return the dataframe so it can be used for summary generation
+    return shap_values_df.copy()
+
+def create_absolute_sorted_bar_plot(fold_df, main_output_dir, pos_color, neg_color, top_n=None):
     """
     Create a bar plot of features sorted by absolute SHAP value, while maintaining directionality.
     
     Args:
-        fold_df: DataFrame with fold-level SHAP values
-        fold_level_importance_df: DataFrame with features sorted by fold-level impact 
+        fold_df: DataFrame with mean SHAP values and statistics for each feature
         main_output_dir: Output directory path
         pos_color: Color for positive SHAP values
         neg_color: Color for negative SHAP values
         top_n: Number of top features to include
     """
-    # Use the same feature selection as the beeswarm plot for consistency,
-    # but sort properly by absolute SHAP values
+    # Use default from color_definitions if not specified
+    # SHAP_TOP_N_FEATURES is imported at the top of the file
+    if top_n is None:
+        top_n = SHAP_TOP_N_FEATURES
     
-    # First get the same features used in the beeswarm plot
-    top_features = fold_level_importance_df.sort_values('Fold_Level_Impact', ascending=False).index.tolist()
+    # Sort by Magnitude (absolute Mean_SHAP) which is the main importance metric
+    top_features = fold_df.sort_values('Magnitude', ascending=False).index.tolist()
     
     # Filter to top_n features and ensure they're in fold_df
     top_features = [f for f in top_features if f in fold_df.index][:top_n]
@@ -840,14 +419,8 @@ def create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_outp
     # Select those features from fold_df
     abs_fold_df = fold_df.loc[top_features].copy()
     
-    # Now create a temporary column for absolute values and sort properly
-    abs_fold_df['abs_shap'] = abs_fold_df['Fold_Mean_SHAP'].abs()
-    
     # Sort by absolute SHAP value in ascending order (smallest absolute values first)
-    abs_fold_df = abs_fold_df.sort_values('abs_shap', ascending=True)
-    
-    # Drop the temporary column
-    abs_fold_df = abs_fold_df.drop(columns=['abs_shap'])
+    abs_fold_df = abs_fold_df.sort_values('Magnitude', ascending=True)
     
     # Create plot
     fig, ax = plt.subplots(figsize=(10, max(6, len(abs_fold_df) * 0.25)))
@@ -855,15 +428,18 @@ def create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_outp
     # Set up y-coordinates
     ys = np.arange(len(abs_fold_df))
     
-    # Draw bars with color based on directionality
-    colors = [pos_color if x > 0 else neg_color for x in abs_fold_df["Fold_Mean_SHAP"]]
-    ax.barh(ys, abs_fold_df["Fold_Mean_SHAP"], height=0.7, color=colors, alpha=1, zorder=2)
+    # Draw error bars with caps to show cross-fold variation
+    for y, (_, row) in zip(ys, abs_fold_df.iterrows()):
+        v = row["Mean_SHAP"]
+        e = row["SHAP_StdDev"]
+        ax.plot([v - e, v + e], [y, y], color="black", lw=1, alpha=0.7, zorder=1)
+        ax.vlines([v - e, v + e], y - 0.2, y + 0.2,
+                  colors="black", lw=1, alpha=0.7, zorder=1)
     
-    # Add error bars
-    for i, (_, row) in enumerate(abs_fold_df.iterrows()):
-        ax.errorbar(row["Fold_Mean_SHAP"], i, 
-                   xerr=row["Fold_SHAP_StdDev"], 
-                   fmt="none", ecolor="black", capsize=3, capthick=1, zorder=3)
+    # Draw bars with color based on directionality
+    colors = [pos_color if x > 0 else neg_color for x in abs_fold_df["Mean_SHAP"]]
+    ax.barh(ys, abs_fold_df["Mean_SHAP"], height=0.7, color=colors, alpha=1, zorder=2)
+    
     
     # Set feature names as y-axis labels
     ax.set_yticks(ys)
@@ -878,11 +454,12 @@ def create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_outp
     
     # Label each bar with its value
     xmin, xmax = ax.get_xlim()
-    epsilon = (xmax - xmin) * 0.01
+    x_range = xmax - xmin
+    epsilon = (x_range) * 0.03  # Increased spacing from whiskers
     for y, (_, row) in zip(ys, abs_fold_df.iterrows()):
-        v = row["Fold_Mean_SHAP"]
-        e = row["Fold_SHAP_StdDev"]
-        label = format_scientific(v, cutoff=0.01, sig=4, sci_sig=1)
+        v = row["Mean_SHAP"]
+        e = row["SHAP_StdDev"]
+        label = format_with_superscripts(v)
         if v < 0:
             x_text = v - e - epsilon
             ha = "right"
@@ -891,17 +468,18 @@ def create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_outp
             ha = "left"
         ax.text(x_text, y, label,
                 va="center", ha=ha, fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.7, pad=1),
+                bbox=dict(facecolor="white", alpha=0.7, pad=1, edgecolor="gray", linewidth=0.5, boxstyle="round,pad=0.5", linestyle="-"),
                 zorder=3)
     
-    # Adjust x-axis limits to ensure labels fit
+    # Adjust x-axis limits to ensure labels fit with balanced padding
     xmin, xmax = ax.get_xlim()
-    ax.set_xlim(xmin*1.2, xmax*1.2)  # Add 20% padding on both sides
+    x_range = xmax - xmin
+    ax.set_xlim(xmin - 0.1 * x_range, xmax + 0.1 * x_range)  # 10% padding on both sides
     
     # Set labels and grid
-    ax.set_xlabel("SHAP Impact (Fold-Level)")
+    ax.set_xlabel("SHAP Value")
     ax.set_ylabel("Feature")
-    ax.set_title(f"Fold-Level SHAP Impact (Top {top_n} Features by Absolute Value)")
+    ax.set_title(f"SHAP Values (Top {top_n} Features by Magnitude)")
     
     ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
     ax.grid(axis="y", visible=False)
@@ -921,8 +499,5 @@ def create_absolute_sorted_bar_plot(fold_df, fold_level_importance_df, main_outp
               ncol=2, frameon=True, fontsize=9, framealpha=0.9)
     
     # Save plot with informative filename
-    plt.savefig(os.path.join(main_output_dir, "shap_bar_impact.png"),
-                bbox_inches="tight", pad_inches=0.1)
-    plt.close()
-
-# Function save_top_features_summary is now in feature_explanation.py
+    fig = plt.gcf()
+    save_plot(fig, os.path.join(main_output_dir, "top_shap_bar_plot.png"), tight_layout=False)

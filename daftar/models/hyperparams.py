@@ -74,7 +74,12 @@ def _get_default_hyperparams() -> Dict[str, Any]:
             'max_depth': {'min': 3, 'max': 20},
             'min_samples_split': {'min': 2, 'max': 10},
             'min_samples_leaf': {'min': 1, 'max': 10},
-            'max_features': {'min': 0.1, 'max': 1.0}
+            'max_features': {'min': 0.1, 'max': 1.0},
+            'bootstrap': {'choices': [True, False]},
+            'criterion': {
+                'classification': ['gini', 'entropy'],
+                'regression': ['squared_error', 'absolute_error']
+            }
         },
         'xgboost': {
             'n_estimators': {'min': 100, 'max': 1000},
@@ -94,7 +99,7 @@ def get_hyperparameter_space(trial, model_type: str, task_type: str = None) -> D
     Args:
         trial: Optuna trial object
         model_type: Model type ('random_forest' or 'xgboost')
-        task_type: Task type ('regression' or 'classification') - kept for backwards compatibility
+        task_type: Task type ('regression' or 'classification') - used for task-specific parameters
         
     Returns:
         Dictionary with hyperparameters for Optuna trials
@@ -121,6 +126,20 @@ def get_hyperparameter_space(trial, model_type: str, task_type: str = None) -> D
                 param_range['min'], 
                 param_range['max']
             )
+        elif param_name == 'bootstrap':
+            # Boolean categorical parameter
+            params[param_name] = trial.suggest_categorical(
+                param_name,
+                param_range['choices']
+            )
+        elif param_name == 'criterion':
+            # Task-specific categorical parameter
+            if task_type and task_type in param_range:
+                params[param_name] = trial.suggest_categorical(
+                    param_name,
+                    param_range[task_type]
+                )
+            # If task_type is not specified or not found, skip this parameter
         else:
             # Float parameters
             params[param_name] = trial.suggest_float(

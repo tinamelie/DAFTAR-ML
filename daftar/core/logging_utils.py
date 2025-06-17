@@ -81,17 +81,18 @@ def setup_logging(output_dir=None, verbose=False):
                             self.buffer = lines.pop()  # Keep last incomplete line in buffer
                             
                             for line in lines:
-                                # Skip all Optuna verbose output lines that start with [I ]
-                                if line.strip().startswith('[I '):
+                                # Skip Optuna timestamped messages with trial information
+                                if re.match(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - INFO - Trial \d+ finished with value:', line.strip()):
+                                    continue
+                                # Skip all other Optuna verbose output lines that start with [I ]
+                                elif line.strip().startswith('[I '):
                                     continue
                                 # Check if this line contains important information from our patterns
                                 elif important_regex.search(line) or line.strip() == "":
                                     # Pass through to console
                                     self.original_stream.write(line + '\n')
-                                # Only show our formatted trial logs (not the raw Optuna ones)
-                                elif ((line.startswith('[Trial') and 'First trial:' in line) or
-                                      (line.startswith('[Trial') and 'New best:' in line) or
-                                      (line.startswith('[Trial') and 'Early stopping triggered' in line)):
+                                # Show all other lines that don't match the filtered patterns
+                                else:
                                     # Pass through to console
                                     self.original_stream.write(line + '\n')
                     
@@ -167,7 +168,6 @@ def setup_logging(output_dir=None, verbose=False):
             logger.addHandler(console_handler)
             
             # Log file is already capturing all output via stdout/stderr redirection
-            logger.info(f"Logging to file: {log_file}")
             
         except Exception as e:
             # In case of failure, at least add a simple console handler

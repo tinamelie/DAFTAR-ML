@@ -6,7 +6,7 @@ input_file: "/path/to/your/data.csv"
 target: "TargetColumn"  # Name of the column to predict
 problem_type: "regression"  # Options: regression, classification
 model: "xgb"  # Options: xgb, rf
-id_column: "ID"  # Column with sample IDs
+sample: "ID"  # Column with sample IDs
 
 # Optional parameters
 metric: "rmse"  # For regression: mse, rmse, mae, r2; For classification: accuracy, f1, roc_auc

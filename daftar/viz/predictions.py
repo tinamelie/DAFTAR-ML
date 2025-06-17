@@ -10,6 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from daftar.viz.common import save_plot
+
 from daftar.viz.colors import (
     DENSITY_ACTUAL_COLOR,
     DENSITY_PREDICTED_COLOR,
@@ -57,7 +59,7 @@ def determine_task_type(y: pd.Series) -> Tuple[bool, str]:
     return False, "regression"
 
 
-def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_dir, original_ids=None, problem_type=None):
+def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_dir, original_ids=None, problem_type=None, config=None):
     """Save a CSV listing the predicted vs. actual target values for each sample in this fold.
     
     Args:
@@ -74,6 +76,21 @@ def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_d
     # Convert to numpy arrays if they are lists
     y_pred_array = np.array(y_pred)
     y_test_array = np.array(y_test)
+    
+    # Convert encoded labels to display labels if needed
+    display_y_pred = y_pred
+    display_y_test = y_test
+    if (config and hasattr(config, 'label_encoder') and 
+        config.label_encoder is not None):
+        try:
+            # Convert to numpy arrays and ensure integer type for inverse transform
+            y_pred_array = np.array(y_pred, dtype=int)
+            y_test_array = np.array(y_test, dtype=int)
+            
+            display_y_pred = config.label_encoder.inverse_transform(y_pred_array)
+            display_y_test = config.label_encoder.inverse_transform(y_test_array)
+        except Exception as e:
+            print(f"Warning: Could not decode labels for fold {fold_idx} CSV: {e}")
     
     # Use original IDs if available, otherwise use provided ids or create placeholders
     if original_ids is not None:
@@ -94,16 +111,16 @@ def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_d
         # Use the explicitly provided problem type
         is_regression = problem_type.lower() == 'regression'
     
-    # Create DataFrame with base columns
+    # Create DataFrame with base columns using display labels
     data_dict = {
         'ID': display_ids,  # These should be original IDs from the dataset when available
-        'Predicted': y_pred,
-        'Actual': y_test
+        'Predicted': display_y_pred,
+        'Actual': display_y_test
     }
     
-    # Add a 'Correct' column only for classification problems
+    # Add a 'Correct' column only for classification problems (use original encoded values for comparison)
     if not is_regression:
-        # For classification, compare predicted and actual classes
+        # For classification, compare predicted and actual classes using original values
         data_dict['Correct'] = ['TRUE' if y_pred[i] == y_test[i] else 'FALSE' for i in range(len(y_pred))]
     
     # Add residual columns only for regression problems
@@ -124,7 +141,6 @@ def save_fold_predictions_vs_actual(fold_idx, ids, y_pred, y_test, main_output_d
     # Save to CSV, ensuring NA values are preserved
     csv_path = os.path.join(fold_dir, f"predictions_vs_actual_fold_{fold_idx}.csv")
     df.to_csv(csv_path, index=False, na_rep='NA')
-    print(f"[Fold {fold_idx}] Predictions vs Actual CSV saved at {csv_path}")
 
 
 def evaluate_predictions(y_true, y_pred):
@@ -137,14 +153,17 @@ def evaluate_predictions(y_true, y_pred):
     Returns:
         Dict of metrics
     """
+    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+    
     # Convert to numpy arrays if they are lists
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
     
-    mse = np.mean((y_true - y_pred) ** 2)
+    # Use sklearn metrics for consistency
+    mse = mean_squared_error(y_true, y_pred)
     rmse = np.sqrt(mse)
-    mae = np.mean(np.abs(y_true - y_pred))
-    r2 = 1 - np.sum((y_true - y_pred) ** 2) / np.sum((y_true - np.mean(y_true)) ** 2)
+    mae = mean_absolute_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred)
     
     return {
         'MSE': mse,
@@ -228,12 +247,72 @@ def generate_confusion_matrix(y_true, y_pred, output_path, title="Confusion Matr
                 bbox={"facecolor": "white", "alpha": 0.9, "pad": 10, "edgecolor": "#cccccc"})
     
     plt.tight_layout()
-    plt.savefig(output_path, bbox_inches='tight')
-    plt.close()
-    print(f"Confusion matrix saved at {output_path}")
+    save_plot(plt.gcf(), output_path, tight_layout=True)
 
 
-def generate_density_plots(fold_results, all_true_values, all_predictions, output_dir, target_name, problem_type="regression", cmap=None):
+def generate_classification_outputs(fold_results, all_true_values, all_predictions, output_dir, config=None):
+    """Generate classification-specific outputs including confusion matrix and CSV.
+    
+    Args:
+        fold_results: Results from each fold
+        all_true_values: All true values (encoded)
+        all_predictions: All predicted values (encoded)
+        output_dir: Output directory path
+        config: Configuration object with label encoder
+    """
+    # Convert lists to numpy arrays if needed
+    all_true_values_array = np.array(all_true_values)
+    all_predictions_array = np.array(all_predictions)
+    
+    # Prepare display versions with original class names
+    display_true_values = all_true_values_array
+    display_predictions = all_predictions_array
+    if (config and hasattr(config, 'label_encoder') and 
+        config.label_encoder is not None):
+        try:
+            display_true_values = config.label_encoder.inverse_transform(all_true_values_array)
+            display_predictions = config.label_encoder.inverse_transform(all_predictions_array)
+        except Exception as e:
+            print(f"Warning: Could not decode labels for display: {e}")
+    
+    # Generate global confusion matrix
+    confusion_path = os.path.join(output_dir, "confusion_matrix_global.png")
+    metric = fold_results[0].get('metric', None) if fold_results else None
+    
+    generate_confusion_matrix(
+        display_true_values, display_predictions,
+        confusion_path,
+        title="Global Confusion Matrix (All Folds)",
+        metric=metric
+    )
+    
+    # Generate overall predictions CSV
+    _generate_classification_csv(fold_results, output_dir, config)
+
+
+def generate_regression_outputs(fold_results, all_true_values, all_predictions, output_dir, target_name, config=None):
+    """Generate regression outputs including density plots and CSV.
+    
+    Args:
+        fold_results: Results from each fold
+        all_true_values: All true values
+        all_predictions: All predicted values  
+        output_dir: Output directory path
+        target_name: Name of target variable
+        config: Configuration object
+    """
+    # Convert lists to numpy arrays if needed
+    all_true_values_array = np.array(all_true_values)
+    all_predictions_array = np.array(all_predictions)
+    
+    # Generate density plots for regression
+    _generate_regression_density_plot(all_true_values_array, all_predictions_array, output_dir, target_name, config)
+    
+    # Generate overall predictions CSV for regression
+    _generate_regression_csv(fold_results, output_dir)
+
+
+def generate_density_plots(fold_results, all_true_values, all_predictions, output_dir, target_name, problem_type="regression", cmap=None, config=None):
     """Generate density plots for the entire set of predictions.
     
     Args:
@@ -244,390 +323,175 @@ def generate_density_plots(fold_results, all_true_values, all_predictions, outpu
         target_name: Name of target variable
         problem_type: Type of problem ('regression' or 'classification')
         cmap: Optional colormap for confusion matrices
-    """
-    # Skip per-fold files - these are now created during each fold's processing phase
-    # This function now only handles the global visualization
-    
-    # If we need confusion matrices for classification problems, they could be added here
-    # This would need to be implemented separately
-
-    # Convert lists to numpy arrays if needed
-    all_true_values_array = np.array(all_true_values)
-    all_predictions_array = np.array(all_predictions)
-    
-    # Create global visualizations based on problem type
-    if problem_type == "classification":
-        # For classification, create a global confusion matrix for all folds combined
-        confusion_path = os.path.join(output_dir, "confusion_matrix_global.png")
-
-        # Get the metric from the first fold (should be consistent across folds)
-        metric = None
-        if fold_results and len(fold_results) > 0:
-            metric = fold_results[0].get('metric', None)
-            
-        # Generate the global confusion matrix
-        generate_confusion_matrix(
-            all_true_values_array, all_predictions_array,
-            confusion_path,
-            title="Global Confusion Matrix (All Folds)",
-            metric=metric,
-            cmap=cmap
-        )
-        print(f"Global confusion matrix saved at {confusion_path}")
-        
-        # Build a simplified overall predictions DataFrame (ID, Fold, Actual, Predicted, Correct)
-        csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
-        
-        all_ids = []
-        all_fold_indices = []
-        all_actual_values = []
-        all_predicted_values = []
-        correct_flags = []
-        
-        # Gather data from each fold
-        for fold_idx, fold in enumerate(fold_results):
-            fold_num = fold_idx + 1
-            
-            # Prefer original IDs when available
-            if 'original_ids' in fold and fold['original_ids'] is not None:
-                sample_ids = fold['original_ids']
-            elif 'ids_test' in fold and fold['ids_test'] is not None:
-                sample_ids = fold['ids_test']
-            else:
-                sample_ids = [f"Sample_{i+1}" for i in range(len(fold['y_test']))]
-            
-            y_true = fold['y_test']
-            y_pred = fold['y_pred']
-            
-            for i in range(len(y_true)):
-                all_ids.append(sample_ids[i])
-                all_fold_indices.append(fold_num)
-                all_actual_values.append(y_true[i])
-                all_predicted_values.append(y_pred[i])
-                correct_flags.append(y_true[i] == y_pred[i])
-        
-        # Create DataFrame with raw data from all folds
-        raw_df = pd.DataFrame({
-            'ID': all_ids,
-            'Fold': all_fold_indices,
-            'Actual': all_actual_values,
-            'Predicted': all_predicted_values,
-            'Correct': ['TRUE' if flag else 'FALSE' for flag in correct_flags]
-        })
-        
-        # Get unique IDs to create a summary by ID
-        unique_ids = sorted(list(set(all_ids)))
-        
-        # Get unique classes from both actual and predicted values
-        all_classes = sorted(list(set(list(set(all_actual_values)) + list(set(all_predicted_values)))))
-        
-        # Prepare summary data
-        summary_data = {
-            'ID': []
-        }
-        
-        # Add a column for each class to count predictions
-        for cls in all_classes:
-            summary_data[f'Predicted_{cls}'] = []
-        
-        summary_data['Actual'] = []
-        summary_data['Overall_Prediction'] = []
-        summary_data['Correct'] = []
-        
-        # Process each unique ID
-        for id_val in unique_ids:
-            id_rows = raw_df[raw_df['ID'] == id_val]
-            
-            if len(id_rows) == 0:
-                continue
-                
-            summary_data['ID'].append(id_val)
-            
-            # Most common actual value (should be the same for all folds)
-            actual_value = id_rows['Actual'].value_counts().index[0]
-            summary_data['Actual'].append(actual_value)
-            
-            # Count predictions for each class
-            pred_counts = id_rows['Predicted'].value_counts().to_dict()
-            for cls in all_classes:
-                summary_data[f'Predicted_{cls}'].append(pred_counts.get(cls, 0))
-            
-            # Find the most predicted class(es)
-            max_count = max(pred_counts.values()) if pred_counts else 0
-            max_classes = [cls for cls, count in pred_counts.items() if count == max_count]
-            
-            # Handle potential ties
-            if len(max_classes) == 1:
-                overall_pred = max_classes[0]
-            else:
-                # If there's a tie, list all tied classes
-                overall_pred = '/'.join(str(cls) for cls in max_classes)
-            
-            summary_data['Overall_Prediction'].append(overall_pred)
-            
-            # Check if the overall prediction matches the actual value
-            # For tied predictions, use a special 'TIE' label when the actual value is among the tied predictions
-            # Always convert to string before checking for '/'
-            overall_pred_str = str(overall_pred)
-            if '/' in overall_pred_str:  # This indicates a tie
-                is_correct = 'TIE' if str(actual_value) in overall_pred_str.split('/') else 'FALSE'
-            else:  # Single prediction
-                is_correct = 'TRUE' if overall_pred == actual_value or str(overall_pred) == str(actual_value) else 'FALSE'
-            
-            summary_data['Correct'].append(is_correct)
-        
-        # Create the summary DataFrame
-        summary_df = pd.DataFrame(summary_data)
-        
-        # Save the summary CSV
-        summary_df.to_csv(csv_path, index=False)
-        print(f"Overall predictions vs actual CSV saved at {csv_path}")
-        return
-    else:
-        # For regression, use density plots as before
-        plt.figure(figsize=(12, 6))
-        sns.kdeplot(all_true_values_array, label='Actual', fill=True, alpha=DENSITY_ALPHA, color=DENSITY_ACTUAL_COLOR)
-        sns.kdeplot(all_predictions_array, label='Predicted', fill=True, alpha=DENSITY_ALPHA, color=DENSITY_PREDICTED_COLOR)
-        plt.title(f"Global Density Plot of Actual vs. Predicted for {target_name}")
-        plt.xlabel(f"{target_name} (Target Value)")
-        plt.ylabel('Density')
-        
-        # Get the user-selected metric for regression
-        scores = evaluate_predictions(all_true_values_array, all_predictions_array)
-        
-        # Get selected metric from any fold (should be the same for all)
-        metric = None
-        if fold_results and len(fold_results) > 0:
-            metric = fold_results[0].get('metric', None)
-        
-        if not metric:
-            metric = os.environ.get('DAFTAR-ML_METRIC', 'rmse').lower()
-        
-        # Display the selected metric
-        if metric.lower() == 'rmse':
-            metrics_text = f"RMSE: {scores['RMSE']:.7f}"
-        elif metric.lower() == 'mse':
-            metrics_text = f"MSE: {scores['MSE']:.7f}"
-        elif metric.lower() == 'mae':
-            metrics_text = f"MAE: {scores['MAE']:.7f}"
-        elif metric.lower() == 'r2':
-            metrics_text = f"R²: {scores['R2']:.7f}"
-        else:
-            # Default to RMSE if metric is not recognized
-            metrics_text = f"RMSE: {scores['RMSE']:.7f}"
-        
-        # Add small margin on the right side
-        plt.tight_layout(rect=[0, 0, 0.85, 1])  
-        
-        # Simple text box with minimal styling
-        plt.gca().text(1.02, 0.5, metrics_text, transform=plt.gca().transAxes,
-                       ha='left', va='center', bbox=dict(facecolor='white', alpha=0.7))
-    
-    plt.tight_layout()
-    density_plot_path = os.path.join(output_dir, "density_actual_vs_pred_global.png")
-    plt.savefig(density_plot_path, bbox_inches='tight')
-    plt.close()
-    print(f"Global density plot saved at {density_plot_path}")
-
-    # Save overall predictions vs. actual targets to a CSV
-    csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
-    
-    # Collect all IDs from fold results
-    all_ids = []
-    for fold in fold_results:
-        if 'original_ids' in fold and fold['original_ids'] is not None:
-            all_ids.extend(fold['original_ids'])
-        elif 'ids_test' in fold:
-            all_ids.extend([f'Sample_{idx}' for idx in fold['ids_test']])
-        else:
-            # Add placeholder IDs if none available
-            all_ids.extend([f'Sample_{i}' for i in range(len(fold.get('y_test', [])))])
-    
-    df_overall = pd.DataFrame({
-        'ID': all_ids,
-        'Predicted': all_predictions,
-        'Actual': all_true_values
-    })
-    
-    # Determine if this is a regression problem based on problem_type or smart detection
-    if problem_type is None:
-        # Convert arrays to pandas Series for smart detection
-        y_true_series = pd.Series(all_true_values)
-        is_classification, detected_type = determine_task_type(y_true_series)
-        is_regression = not is_classification
-    else:
-        # Use the explicitly provided problem type
-        is_regression = problem_type.lower() == 'regression'
-    
-    # Calculate residuals only for regression problems
-    if is_regression:  # Only for regression
-        df_overall['Residual'] = np.array(df_overall['Predicted']) - np.array(df_overall['Actual'])
-        df_overall['Abs_Residual'] = np.abs(df_overall['Residual'])
-    
-    # Only calculate prediction stats for regression problems
-    if is_regression:  # Only for regression
-        # Calculate min and max predictions for each actual value
-        prediction_stats = df_overall.groupby('Actual')['Predicted'].agg(['min', 'max']).reset_index()
-        prediction_stats.columns = ['Actual', 'Min_Prediction', 'Max_Prediction']
-        
-        # For each row in df_overall, add the min and max prediction for its actual value
-        actual_to_min = dict(zip(prediction_stats['Actual'], prediction_stats['Min_Prediction']))
-        actual_to_max = dict(zip(prediction_stats['Actual'], prediction_stats['Max_Prediction']))
-        
-        # Add min/max columns based on the actual value for each row
-        df_overall['min_pred'] = df_overall['Actual'].map(actual_to_min)
-        df_overall['max_pred'] = df_overall['Actual'].map(actual_to_max)
-    
-    # Save the enhanced file (without creating additional files)
-    df_overall.to_csv(csv_path, index=False)
-    print(f"Overall predictions vs actual CSV saved at {csv_path}")
-
-
-def save_top_features_summary(feature_impact_df, main_output_dir, config):
-    """Create a text file summarizing the most important features based on SHAP stats.
-    
-    Args:
-        feature_impact_df: DataFrame with SHAP impact statistics
-        main_output_dir: Output directory path
         config: Configuration object
     """
-    # Create a text file summarizing the most important features based on SHAP stats.
-    summary_path = os.path.join(main_output_dir, "shap_features_summary.txt")
+    if problem_type == "classification":
+        generate_classification_outputs(fold_results, all_true_values, all_predictions, output_dir, config)
+    else:
+        generate_regression_outputs(fold_results, all_true_values, all_predictions, output_dir, target_name, config)
+
+
+def _generate_classification_csv(fold_results, output_dir, config=None):
+    """Generate overall predictions CSV for classification."""
+    csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
     
-    # Check if feature_impact_df is None
-    if feature_impact_df is None:
-        print("Important features summary cannot be generated: no SHAP data available")
-        return
-        
-    # Create a default target if missing from config
-    target = getattr(config, 'target', 'Target')
-    metric = getattr(config, 'metric', 'accuracy')
-    model_type = getattr(config, 'model', 'model')
-    problem_type = getattr(config, 'problem_type', 'regression')
+    all_ids = []
+    all_fold_indices = []
+    all_actual_values = []
+    all_predicted_values = []
+    correct_flags = []
     
-    # Get configuration values
-    top_n = config.top_n
-    transform_x = getattr(config, 'transform_features', False)
-    transform_y = getattr(config, 'transform_target', False)
+    # Gather data from each fold
+    for fold_idx, fold in enumerate(fold_results):
+        fold_num = fold_idx + 1
+        
+        # Prefer original IDs when available
+        if 'original_ids' in fold and fold['original_ids'] is not None:
+            sample_ids = fold['original_ids']
+        elif 'ids_test' in fold and fold['ids_test'] is not None:
+            sample_ids = fold['ids_test']
+        else:
+            sample_ids = [f"Sample_{i+1}" for i in range(len(fold['y_test']))]
+        
+        y_true = fold['y_test']
+        y_pred = fold['y_pred']
+        
+        # Convert encoded labels to display labels for CSV if needed
+        display_y_true = y_true
+        display_y_pred = y_pred
+        if (config and hasattr(config, 'label_encoder') and 
+            config.label_encoder is not None):
+            try:
+                display_y_true = config.label_encoder.inverse_transform(y_true)
+                display_y_pred = config.label_encoder.inverse_transform(y_pred) 
+            except Exception as e:
+                print(f"Warning: Could not decode labels for CSV display: {e}")
+        
+        for i in range(len(y_true)):
+            all_ids.append(sample_ids[i])
+            all_fold_indices.append(fold_num)
+            all_actual_values.append(display_y_true[i])
+            all_predicted_values.append(display_y_pred[i])
+            correct_flags.append(y_true[i] == y_pred[i])
     
-    # Create feature data organized by different metrics - reflecting only main columns in CSV
-    sections = {
-        "Fold_Mean_SHAP": feature_impact_df.sort_values("Fold_Mean_SHAP", ascending=False),
-        "Sample_Mean_SHAP": feature_impact_df.sort_values("Sample_Mean_SHAP", ascending=False),
-        "Fold_Level_Impact": feature_impact_df.sort_values("Fold_Level_Impact", ascending=False),
-        "Sample_Level_Impact": feature_impact_df.sort_values("Sample_Level_Impact", ascending=False),
-    }
+    # Create DataFrame and save
+    df_overall = pd.DataFrame({
+        'ID': all_ids,
+        'Fold': all_fold_indices,
+        'Actual': all_actual_values,
+        'Predicted': all_predicted_values,
+        'Correct': correct_flags
+    })
     
-    # Add correlation sections only for regression problems
-    if problem_type == 'regression':
-        if 'Fold_Level_Correlation' in feature_impact_df.columns:
-            sections["Fold_Level_Correlation"] = feature_impact_df.sort_values("Fold_Level_Correlation", ascending=False)
-        if 'Sample_Level_Correlation' in feature_impact_df.columns:
-            sections["Sample_Level_Correlation"] = feature_impact_df.sort_values("Sample_Level_Correlation", ascending=False)
+    df_overall.to_csv(csv_path, index=False, na_rep='NA')
+
+
+def _generate_regression_density_plot(all_true_values, all_predictions, output_dir, target_name, config=None):
+    """Generate density plot for regression predictions."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    import sklearn.metrics
+    import os
+    from daftar.viz.common import save_plot
+    from daftar.viz.colors import DENSITY_ACTUAL_COLOR, DENSITY_PREDICTED_COLOR, DENSITY_ALPHA
     
-    # Also add positive/negative impact sections based on Fold_Mean_SHAP
-    positive_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] > 0].sort_values("Fold_Mean_SHAP", ascending=False)
-    negative_features = feature_impact_df[feature_impact_df["Fold_Mean_SHAP"] < 0].sort_values("Fold_Mean_SHAP", ascending=True)
+    # Convert to numpy arrays if needed
+    all_true_values = np.array(all_true_values)
+    all_predictions = np.array(all_predictions)
     
-    # Write out a concise summary of feature impacts
-    with open(summary_path, 'w') as f:
-        f.write("="*80 + "\n")
-        f.write(f"FEATURE IMPORTANCE SUMMARY FOR {target} PREDICTION\n")
-        f.write("="*80 + "\n\n")
-        
-        f.write(f"Model Type: {model_type}\n")
-        f.write(f"Optimization Metric: {metric}\n")
-        if transform_x:
-            f.write("Feature Transformation: Log1p\n")
-        if transform_y:
-            f.write("Target Transformation: Log1p\n")
-        f.write("\n")
-        
-        # Explanation of different columns
-        f.write("="*80 + "\n")
-        f.write("EXPLANATION OF FEATURE METRICS\n")
-        f.write("="*80 + "\n\n")
-        f.write("DAFTAR-ML provides multiple metrics for each feature:\n\n")
-        
-        f.write("Fold_Mean_SHAP: Average SHAP value across folds (positive = increases prediction, negative = decreases)\n")
-        f.write("Sample_Mean_SHAP: Average SHAP value across all samples\n")
-        f.write("Fold_Level_Impact: Average absolute SHAP impact across folds\n")
-        f.write("Sample_Level_Impact: Average absolute SHAP impact across all samples\n")
-        
-        if problem_type == 'regression':
-            f.write("Fold_Level_Correlation: Correlation between SHAP values and target (fold-level)\n")
-            f.write("Sample_Level_Correlation: Correlation between SHAP values and target (sample-level)\n")
-            f.write("\n")
-        
-        # Generate sections for each metric
-        for metric_name, metric_df in sections.items():
-            f.write("="*80 + "\n")
-            if metric_name == "Fold_Mean_SHAP":
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Fold-Level, Column: {metric_name}) [shap_bar_fold.png]\n")
-            elif metric_name == "Sample_Mean_SHAP":
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Sample-Level, Column: {metric_name}) [shap_bar_sample.png]\n")
-            elif metric_name == "Fold_Level_Correlation" and problem_type == 'regression':
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Fold-Level, Column: {metric_name}) [shap_corr_bar_fold.png]\n")
-            elif metric_name == "Sample_Level_Correlation" and problem_type == 'regression':
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Sample-Level, Column: {metric_name}) [shap_corr_bar_sample.png]\n")
-            elif metric_name.startswith("Fold_"):
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Fold-Level, Column: {metric_name})\n")
-            elif metric_name.startswith("Sample_"):
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Sample-Level, Column: {metric_name})\n")
-            else:
-                f.write(f"TOP {top_n} FEATURES BY {metric_name} (Column: {metric_name})\n")
-            f.write("="*80 + "\n\n")
-            
-            for i, (feature, row) in enumerate(metric_df.head(top_n).iterrows(), 1):
-                f.write(f"{i}. {feature}: {row[metric_name]: .6f}")
-                
-                # Add standard deviation only for SHAP values (not impacts or correlations)
-                if metric_name == "Fold_Mean_SHAP" and "Fold_SHAP_StdDev" in row:
-                    f.write(f" (±{row['Fold_SHAP_StdDev']:.6f})")
-                elif metric_name == "Sample_Mean_SHAP" and "Sample_SHAP_StdDev" in row:
-                    f.write(f" (±{row['Sample_SHAP_StdDev']:.6f})")
-                
-                f.write("\n")
-        
-            # Add extra space after the last item in the list
-            f.write("\n")
-        
-        # Special sections for positive and negative impacts
-        f.write("="*80 + "\n")
-        f.write(f"TOP {top_n} FEATURES WITH POSITIVE IMPACT (Fold-Level, Column: Fold_Mean_SHAP > 0) [shap_bar_fold.png]\n")
-        f.write("="*80 + "\n\n")
-        
-        for i, (feature, row) in enumerate(positive_features.head(top_n).iterrows(), 1):
-            f.write(f"{i}. {feature}: {row['Fold_Mean_SHAP']:.6f}")
-            if "Fold_SHAP_StdDev" in row:
-                f.write(f" (±{row['Fold_SHAP_StdDev']:.6f})")
-            f.write("\n")
-        
-        # Add extra space after the list
-            f.write("\n")
-        
-        f.write("="*80 + "\n")
-        f.write(f"TOP {top_n} FEATURES WITH NEGATIVE IMPACT (Fold-Level, Column: Fold_Mean_SHAP < 0) [shap_bar_fold.png]\n")
-        f.write("="*80 + "\n\n")
-        
-        for i, (feature, row) in enumerate(negative_features.head(top_n).iterrows(), 1):
-            f.write(f"{i}. {feature}: {abs(row['Fold_Mean_SHAP']):.6f}")
-            if "Fold_SHAP_StdDev" in row:
-                f.write(f" (±{row['Fold_SHAP_StdDev']:.6f})")
-            f.write("\n")
-        
-        # Add extra space after the list
-            f.write("\n")
-        
-        f.write("="*80 + "\n")
-        f.write("INTERPRETATION GUIDE\n")
-        f.write("="*80 + "\n\n")
-        f.write("SHAP values represent the impact of each feature on model predictions.\n")
-        f.write("- Positive values mean the feature pushes predictions higher\n")
-        f.write("- Negative values mean the feature pushes predictions lower\n")
-        f.write("- The magnitude indicates how strong the effect is\n")
-        f.write("- Standard deviation (±) shows the variability of this effect\n\n")
-        f.write("These values are calculated based on SHAP (SHapley Additive exPlanations),\n")
-        f.write("which analyzes each feature's contribution to predictions across the dataset.\n")
+    plt.figure(figsize=(10, 6))
+    sns.kdeplot(all_true_values, label="Actual", fill=True, alpha=DENSITY_ALPHA, color=DENSITY_ACTUAL_COLOR)
+    sns.kdeplot(all_predictions, label="Predicted", fill=True, alpha=DENSITY_ALPHA, color=DENSITY_PREDICTED_COLOR)
+    plt.title("Global Density Plot - Actual vs Predicted")
+    plt.xlabel(target_name)
+    plt.ylabel("Density")
+    plt.legend()
+    plt.grid(alpha=0.3)
     
-    print(f"Important features summary saved to {summary_path}")
+    # Calculate metrics
+    scores = {}
+    scores['MSE'] = sklearn.metrics.mean_squared_error(all_true_values, all_predictions)
+    scores['RMSE'] = np.sqrt(scores['MSE'])
+    scores['MAE'] = sklearn.metrics.mean_absolute_error(all_true_values, all_predictions)
+    scores['R2'] = sklearn.metrics.r2_score(all_true_values, all_predictions)
+    
+    # Get the selected metric from config
+    metric = config.metric.lower() if config and hasattr(config, 'metric') else 'mse'
+    
+    # Create the metric text with appropriate precision for the selected metric only
+    if metric == 'rmse':
+        metrics_text = f"RMSE: {scores['RMSE']:.7f}"
+    elif metric == 'mse':
+        metrics_text = f"MSE: {scores['MSE']:.7f}"
+    elif metric == 'mae':
+        metrics_text = f"MAE: {scores['MAE']:.7f}"
+    elif metric == 'r2':
+        metrics_text = f"R²: {scores['R2']:.7f}"
+    else:
+        # Default to MSE if metric not recognized
+        metrics_text = f"MSE: {scores['MSE']:.7f}"
+    
+    # Get number of folds from config
+    n_folds = config.outer_folds if config and hasattr(config, 'outer_folds') else 5  # Default to 5 if not available
+    
+    # Add metrics box with updated legend
+    plt.tight_layout(rect=[0, 0, 0.85, 1])
+    plt.gca().text(1.02, 0.5, f"Average Test Metric\nAcross {n_folds} Folds:\n{metrics_text}", 
+                  transform=plt.gca().transAxes,
+                  ha='left', va='center', 
+                  bbox=dict(facecolor='white', alpha=0.7))
+    
+    # Save the plot with the expected filename
+    output_path = os.path.join(output_dir, "density_plot_overall.png")
+    save_plot(plt.gcf(), output_path, tight_layout=True)
+
+
+def _generate_regression_csv(fold_results, output_dir):
+    """Generate overall predictions CSV for regression."""
+    import pandas as pd
+    import os
+    
+    csv_path = os.path.join(output_dir, "predictions_vs_actual_overall.csv")
+    
+    all_ids = []
+    all_fold_indices = []
+    all_actual_values = []
+    all_predicted_values = []
+    all_residuals = []
+    
+    # Gather data from each fold
+    for fold_idx, fold in enumerate(fold_results):
+        fold_num = fold_idx + 1
+        
+        # Prefer original IDs when available
+        if 'original_ids' in fold and fold['original_ids'] is not None:
+            sample_ids = fold['original_ids']
+        elif 'ids_test' in fold and fold['ids_test'] is not None:
+            sample_ids = fold['ids_test']
+        else:
+            sample_ids = [f"Sample_{i+1}" for i in range(len(fold['y_test']))]
+        
+        y_true = fold['y_test']
+        y_pred = fold['y_pred']
+        
+        # Calculate residuals (actual - predicted)
+        residuals = y_true - y_pred if hasattr(y_true, '__sub__') else [true - pred for true, pred in zip(y_true, y_pred)]
+        
+        for i in range(len(y_true)):
+            all_ids.append(sample_ids[i])
+            all_fold_indices.append(fold_num)
+            all_actual_values.append(y_true[i] if hasattr(y_true, '__getitem__') else y_true.iloc[i])
+            all_predicted_values.append(y_pred[i])
+            all_residuals.append(residuals[i] if hasattr(residuals, '__getitem__') else residuals.iloc[i])
+    
+    # Create DataFrame and save
+    df_overall = pd.DataFrame({
+        'ID': all_ids,
+        'Fold': all_fold_indices,
+        'Actual': all_actual_values,
+        'Predicted': all_predicted_values,
+        'Residual': all_residuals
+    })
+    
+    df_overall.to_csv(csv_path, index=False, na_rep='NA')

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "daftar-ml"
-version = "0.1.4"
+version = "0.1.5"
 description = "Data-Agnostic Feature-Target Analysis & Ranking Machine Learning Pipeline (DAFTAR-ML)"
 authors = [
     {name = "Tina Melie", email = "drtinamelie@gmail.com"}
@@ -38,9 +38,9 @@ Repository = "https://github.com/tinamelie/DAFTAR-ML"
 [project.scripts]
 daftar = "daftar.cli:main"
 run-daftar = "daftar.cli:main"
-daftar-preprocess = "daftar.tools.preprocess:main"
-daftar-cv = "daftar.tools.cv_calculator:main"
-daftar-colors = "daftar.tools.colors:main"
+daftar-preprocess = "daftar.data.preprocessing_data:main"
+daftar-cv = "daftar.pipeline.cross_validation:main"
+daftar-colors = "daftar.viz.colors:main"
 
 [tool.setuptools]
 packages = {find = {exclude = ["tests", "results", "examples"]}}

@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, confusion_matrix
 
-# These functions would normally be extracted from pipeline.py, core_plots.py, and predictions.py
-# For this restructuring, we're creating placeholder functions with the right signatures
 
 def evaluate_classification_predictions(y_true, y_pred, y_prob=None):
     """Calculate classification-specific performance metrics.

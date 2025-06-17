@@ -16,6 +16,8 @@ from sklearn.metrics import (
 )
 from scipy import stats
 
+from daftar.viz.common import save_plot
+
 from daftar.viz.colors import (
     CONFUSION_MATRIX_CMAP,
     REGRESSION_MEAN_LINE_COLOR,
@@ -70,8 +72,8 @@ def plot_regression_metrics(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()
 
@@ -114,8 +116,8 @@ def plot_regression_residuals(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()
 
@@ -148,8 +150,8 @@ def plot_regression_distribution(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()
 
@@ -202,8 +204,8 @@ def plot_confusion_matrix(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()
 
@@ -277,8 +279,8 @@ def plot_roc_curve(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()
 
@@ -349,8 +351,8 @@ def plot_precision_recall_curve(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()
 
@@ -473,6 +475,107 @@ def generate_classification_visualizations(
     return plot_paths
 
 
+def plot_overfitting_analysis(
+    fold_results: List[Dict[str, Any]],
+    output_path: Optional[Path] = None,
+    title: str = "Training vs Validation Metrics",
+    problem_type: str = 'regression'
+) -> None:
+    """Generate visualization comparing training and validation metrics for overfitting analysis.
+    
+    Args:
+        fold_results: List of fold result dictionaries containing train_metrics and test_metrics
+        output_path: Path to save the plot
+        title: Plot title
+        problem_type: Type of problem ('regression' or 'classification')
+    """
+    # Extract training and validation metrics from each fold
+    train_metrics_by_fold = []
+    val_metrics_by_fold = []
+    fold_indices = []
+    
+    for i, fold_data in enumerate(fold_results, 1):
+        if 'train_metrics' in fold_data and 'test_metrics' in fold_data:
+            train_metrics_by_fold.append(fold_data['train_metrics'])
+            val_metrics_by_fold.append(fold_data['test_metrics'])
+            fold_indices.append(i)
+    
+    if not train_metrics_by_fold or not val_metrics_by_fold:
+        print("No training or validation metrics found in fold results")
+        return
+    
+    # Get metric names based on problem type
+    if problem_type == 'regression':
+        metrics_to_plot = ['r2', 'rmse', 'mae']
+        metric_labels = {'r2': 'R²', 'rmse': 'RMSE', 'mae': 'MAE'}
+    else:  # classification
+        metrics_to_plot = ['accuracy', 'f1']
+        if 'roc_auc' in val_metrics_by_fold[0]:
+            metrics_to_plot.append('roc_auc')
+        metric_labels = {'accuracy': 'Accuracy', 'f1': 'F1 Score', 'roc_auc': 'ROC AUC'}
+    
+    # Only plot metrics that exist in both training and validation
+    metrics_to_plot = [m for m in metrics_to_plot if m in train_metrics_by_fold[0] and m in val_metrics_by_fold[0]]
+    
+    # Create subplots
+    n_metrics = len(metrics_to_plot)
+    fig, axes = plt.subplots(1, n_metrics, figsize=(5 * n_metrics, 6))
+    if n_metrics == 1:
+        axes = [axes]  # Make axes indexable for single metric
+    
+    # Plot each metric
+    for i, metric in enumerate(metrics_to_plot):
+        ax = axes[i]
+        
+        # Extract values for this metric
+        train_values = [m[metric] for m in train_metrics_by_fold]
+        val_values = [m[metric] for m in val_metrics_by_fold]
+        
+        # Create a DataFrame for easier plotting
+        df = pd.DataFrame({
+            'Fold': fold_indices + fold_indices,
+            'Value': train_values + val_values,
+            'Dataset': ['Training'] * len(train_values) + ['Validation'] * len(val_values)
+        })
+        
+        # Plot with seaborn
+        sns.barplot(x='Fold', y='Value', hue='Dataset', data=df, ax=ax)
+        
+        # Calculate average difference and overfitting percentage
+        diffs = [abs(t - v) for t, v in zip(train_values, val_values)]
+        avg_diff = np.mean(diffs)
+        pct_diff = 100 * avg_diff / np.mean(val_values) if np.mean(val_values) != 0 else 0
+        
+        # Add metric name and difference as title
+        metric_name = metric_labels.get(metric, metric.upper())
+        ax.set_title(f"{metric_name}\nAvg Diff: {avg_diff:.4f} ({pct_diff:.1f}%)")
+        
+        # Flag overfitting if difference is more than 20%
+        if pct_diff > 20:
+            ax.text(0.5, 0.02, "Possible Overfitting", 
+                   ha='center', va='bottom', transform=ax.transAxes,
+                   fontsize=12, color='red', fontweight='bold')
+        
+        # Format y-axis
+        if metric == 'r2':
+            ax.set_ylim(max(-1, min(train_values + val_values) - 0.1), 1.05)
+        
+        # Add grid for readability
+        ax.grid(True, linestyle='--', alpha=0.7)
+    
+    # Set overall title
+    plt.suptitle(title, fontsize=16, y=1.02)
+    plt.tight_layout()
+    
+    # Save or show the plot
+    if output_path:
+        plt.savefig(output_path, bbox_inches='tight', dpi=300)
+        print(f"Overfitting analysis plot saved.")
+    else:
+        plt.show()
+    plt.close()
+
+
 def generate_fold_metrics_visualization(
     fold_metrics: List[Dict[str, float]],
     output_path: Optional[Path] = None,
@@ -536,7 +639,7 @@ def generate_fold_metrics_visualization(
     
     # Save or display the plot
     if output_path:
-        plt.savefig(output_path, bbox_inches='tight')
-        plt.close()
+        fig = plt.gcf()
+        save_plot(fig, output_path, tight_layout=True)
     else:
         plt.show()

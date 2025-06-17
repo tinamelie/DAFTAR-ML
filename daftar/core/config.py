@@ -54,6 +54,7 @@ class Config:
         original_command: The original command that was used to run the pipeline
         use_stratified: Whether to use stratified splitting for classification (default: True)
         confusion_cmap: Colormap to use for confusion matrices (default: 'Blues')
+        skip_interaction: Whether to skip SHAP interaction calculations (default: False)
     """
     # Required parameters
     input_file: str
@@ -91,6 +92,7 @@ class Config:
     
     # New parameter
     use_stratified: bool = True
+    skip_interaction: bool = False
     
     def __post_init__(self):
         """Validate and set derived attributes after initialization."""
@@ -152,9 +154,7 @@ class Config:
         
         # Create auto-generated name that includes problem type
         components = ["DAFTAR-ML", self.target, full_model_name, self.problem_type]
-        
-        # Transformation info now in preprocessed filename
-            
+                    
         # Add CV info
         components.append(f"cv{self.outer_folds}x{self.inner_folds}x{self.repeats}")
         
@@ -210,5 +210,6 @@ class Config:
             "top_n": self.top_n,
             "force_overwrite": self.force_overwrite,
             "use_stratified": self.use_stratified,
-            "confusion_cmap": self.confusion_cmap
+            "confusion_cmap": self.confusion_cmap,
+            "skip_interaction": self.skip_interaction
         }

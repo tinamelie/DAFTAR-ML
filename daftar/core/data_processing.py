@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 from typing import Tuple, List, Dict, Any, Optional
+from sklearn.preprocessing import LabelEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,6 @@ def prepare_data(config) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         Tuple of (feature matrix, target vector, feature names)
     """
     # Load data
-    logger.info(f"Loading data from {config.input_file}")
     try:
         data = pd.read_csv(config.input_file)
     except Exception as e:
@@ -45,17 +45,35 @@ def init_dataset(
     if config.target not in data.columns:
         raise ValueError(f"Target column '{config.target}' not found in data")
     
+    # Store original data with IDs for later reference (BEFORE any modifications)
     original_data = None
-    # Store original data with IDs for later reference
     if config.id_column and config.id_column in data.columns:
-        # Make a copy of the original data with index set to match the dataset
         original_data = data.copy().reset_index(drop=True)
         # Remove ID column from working data
         data = data.drop(columns=[config.id_column])
     
     # Split features and target
-    y = data[config.target].values
+    y = data[config.target].values.copy()  # Make a copy to avoid modifying original
     X = data.drop(columns=[config.target])
+    
+    # Apply label encoding for classification tasks
+    config.label_encoder = None  # Initialize to None
+    if hasattr(config, 'problem_type') and config.problem_type == 'classification':
+        # Check if target contains non-numeric values OR string-like numeric values
+        if (not pd.api.types.is_numeric_dtype(data[config.target]) or 
+            data[config.target].dtype == 'object' or
+            data[config.target].dtype.name in ['string', 'category']):
+            
+            logger.info(f"Encoding labels for classification task")
+            label_encoder = LabelEncoder()
+            y_encoded = label_encoder.fit_transform(y)
+            
+            # Store label encoder for later use
+            config.label_encoder = label_encoder
+            print(f"Classes: {list(label_encoder.classes_)}")
+            
+            # Use encoded values for training
+            y = y_encoded
     
     # Get feature names
     if feature_names is None:
@@ -63,7 +81,5 @@ def init_dataset(
     
     # Convert to numpy arrays
     X = X.values
-    
-    # Note: All transformations are now applied during preprocessing
     
     return X, y, feature_names, original_data

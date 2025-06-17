@@ -16,7 +16,7 @@ class BaseModel(ABC):
     """Base abstract class for all DAFTAR-ML models."""
     
     def __init__(self, metric: str, n_trials: int, n_jobs: int,
-                 patience: int = 3, relative_threshold: float = 1e-6,
+                 patience: int = 50, relative_threshold: float = 1e-6,
                  seed: Optional[int] = None):
         """Initialize model.
         
@@ -63,7 +63,7 @@ class BaseRegressionModel(BaseModel):
     """Base class for all regression models."""
     
     def __init__(self, metric: str, n_trials: int, n_jobs: int,
-                 patience: int = 3, relative_threshold: float = 1e-6,
+                 patience: int = 50, relative_threshold: float = 1e-6,
                  seed: Optional[int] = None):
         """Initialize regression model.
         
@@ -86,7 +86,7 @@ class BaseClassificationModel(BaseModel):
     """Base class for all classification models."""
     
     def __init__(self, metric: str, n_trials: int, n_jobs: int,
-                 patience: int = 3, relative_threshold: float = 1e-6,
+                 patience: int = 50, relative_threshold: float = 1e-6,
                  seed: Optional[int] = None):
         """Initialize classification model.
         

@@ -20,25 +20,24 @@ def main():
     parser = argparse.ArgumentParser(
         description="Preprocess a dataset for DAFTAR-ML", 
         allow_abbrev=False,
-        usage="usage: daftar-preprocess [-h] --input PATH --target COLUMN --id COLUMN [--output_dir PATH] [--force] [--no_report] [--task {regression,classification}] [--k INTEGER] [--trans_feat {log1p,standard,minmax}] [--trans_target {log1p,standard,minmax}] [--jobs INTEGER] [--keep_na] [--keep_constant] [--no_rename] [--keep_zero_mi]"
+        usage="usage: daftar-preprocess [-h] --input PATH --target COLUMN --sample COLUMN [--output_dir PATH] [--force] [--no_report] [--task_type {regression,classification}] [--k INTEGER] [--trans_feat {log1p,standard,minmax}] [--trans_target {log1p,standard,minmax}] [--jobs INTEGER] [--keep_na] [--keep_constant] [--no_rename] [--keep_zero_mi]"
     )
     
     # Required parameters
     required_args = parser.add_argument_group('Required parameters')
     required_args.add_argument("--input", required=True, metavar="PATH", help="Path to input CSV file containing features and target")
     required_args.add_argument("--target", required=True, metavar="COLUMN", help="Name of the target column to predict")
-    required_args.add_argument("--id", required=True, metavar="COLUMN", help="Name of the ID column (e.g., species identifiers, sample names)")
+    required_args.add_argument("--sample", required=True, metavar="COLUMN", help="Name of the column containing sample identifiers (e.g., species identifiers, sample names)")
     
     # Output configuration
     output_args = parser.add_argument_group('Output configuration')
     output_args.add_argument("--output_dir", metavar="PATH", help="Directory where output files will be saved. If not specified, files will be saved in the input file's directory")
     output_args.add_argument("--force", action="store_true", help="Force overwrite if output file already exists")
     output_args.add_argument("--no_report", action="store_true", help="Skip generating the detailed text report and feature importance CSV file")
-    # Removed --quiet option
     
     # Analysis configuration
     analysis_args = parser.add_argument_group('Analysis configuration')
-    analysis_args.add_argument("--task", choices=["regression", "classification"], 
+    analysis_args.add_argument("--task_type", choices=["regression", "classification"], 
                         help="Problem type: 'regression' for continuous targets, 'classification' for binary targets (optional - will be auto-detected if not specified)")
     analysis_args.add_argument("--k", type=int, default=500, metavar="INTEGER",
                         help="Number of top features to select based on mutual information scores (default: 500)")
@@ -68,10 +67,10 @@ def main():
 EXAMPLES:
 
   Default usage (auto-detects task type):
-    daftar-preprocess --input PATH --target COLUMN --id COLUMN --output_dir PATH
+    daftar-preprocess --input PATH --target COLUMN --sample COLUMN --output_dir PATH
 
   Select top 200 features with log transformation:
-    daftar-preprocess --input PATH --target COLUMN --id COLUMN --k 200 --trans_feat log1p --output_dir PATH
+    daftar-preprocess --input PATH --target COLUMN --sample COLUMN --k 200 --trans_feat log1p --output_dir PATH
 """
     # Set formatter to preserve formatting
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
@@ -93,27 +92,27 @@ EXAMPLES:
         print(f"Total columns: {data.shape[1]}")
         
         # Auto-detect task type if not specified
-        if not args.task:
+        if not args.task_type:
             target_data = data[args.target].dropna()
             unique_values = target_data.unique()
             
             # If only 2 unique values or boolean values, it's classification
             if len(unique_values) <= 2 or target_data.dtype == bool:
-                args.task = "classification"
+                args.task_type = "classification"
                 print(f"\nBinary data detected in '{args.target}' column - performing CLASSIFICATION analysis")
             else:
                 # If more than 2 unique values and numeric, it's likely regression
                 if pd.api.types.is_numeric_dtype(target_data):
-                    args.task = "regression"
+                    args.task_type = "regression"
                     print(f"\nContinuous data detected in '{args.target}' column - performing REGRESSION analysis")
                 else:
                     # If more than 2 unique values but not numeric, default to classification with a warning
-                    args.task = "classification"
+                    args.task_type = "classification"
                     print(f"\n[WARNING] Unable to auto-detect task type. Defaulting to CLASSIFICATION.")
-                    print(f"   Consider specifying --task explicitly if this is incorrect.")
+                    print(f"   Consider specifying --task_type explicitly if this is incorrect.")
         else:
             # User specified task type explicitly
-            if args.task == "regression":
+            if args.task_type == "regression":
                 print(f"\n[USER-SPECIFIED] Performing REGRESSION analysis")
             else:
                 print(f"\n[USER-SPECIFIED] Performing CLASSIFICATION analysis")
@@ -127,7 +126,7 @@ EXAMPLES:
             
         # Create filename with the task type
         # Use shorter classification abbreviation
-        task_abbr = "classif" if args.task == "classification" else args.task
+        task_abbr = "classif" if args.task_type == "classification" else args.task_type
         filename = f"{input_path.stem}_MI{args.k}_{task_abbr}{transform_suffix}{input_path.suffix}"
         
         # Determine output directory
@@ -151,7 +150,7 @@ EXAMPLES:
             cmd = f"python preprocess.py --input {args.input}"
             if args.output_dir:
                 cmd += f" --output_dir {args.output_dir}"
-            cmd += f" --target {args.target} --id {args.id}"
+            cmd += f" --target {args.target} --sample {args.sample}"
             # Don't include task since it's auto-detected
             cmd += f" --force"
             print(cmd)
@@ -162,7 +161,7 @@ EXAMPLES:
         
         # 2. Define target and features
         target_column = args.target
-        id_column = args.id
+        id_column = args.sample
         
         # Check for duplicate IDs and handle them if found
         duplicate_ids = data[id_column].duplicated()
@@ -216,19 +215,19 @@ EXAMPLES:
                 feature_columns = [feature_columns[i] for i in non_constant_cols]
         
         # 4. Define mutual information computation based on task
-        if args.task == 'classification':
+        if args.task_type == 'classification':
             # Check if target is actually binary/discrete
             unique_values = np.unique(y)
             if len(unique_values) > 10 or np.issubdtype(y.dtype, np.floating):
                 raise ValueError(
                     f"Error: Your target variable '{args.target}' appears to be continuous (found {len(unique_values)} unique values). "
                     f"For classification tasks, the target should contain discrete classes (e.g., 0/1 or True/False). "
-                    f"If your target is continuous, use --task regression instead."
+                    f"If your target is continuous, use --task_type regression instead."
                 )
             from sklearn.feature_selection import mutual_info_classif
             mi_func = mutual_info_classif
             print(f"Using mutual_info_classif for classification analysis")
-        else:  # args.task == 'regression'
+        else:  # args.task_type == 'regression'
             from sklearn.feature_selection import mutual_info_regression
             mi_func = mutual_info_regression
             print(f"Using mutual_info_regression for regression analysis")
@@ -281,7 +280,7 @@ EXAMPLES:
             if not args.keep_zero_mi:
                 print(f"\nRemoving {len(zero_mi_features)} features with zero mutual information...")
                 print("To keep these features (not recommended), run:")
-                print(f"python preprocess.py --input {args.input} --target {args.target} --id {args.id} --task {args.task} --output_dir {args.output_dir} --k {args.k} --keep_zero_mi")
+                print(f"python preprocess.py --input {args.input} --target {args.target} --sample {args.sample} --task_type {args.task_type} --output_dir {args.output_dir} --k {args.k} --keep_zero_mi")
                 
                 # Remove zero MI features
                 non_zero_indices = [i for i in top_k_indices if i not in zero_mi_indices]
@@ -327,7 +326,7 @@ EXAMPLES:
                 print("Min-max scaling applied to features")
         
         # Apply target transformation if requested (regression only)
-        if args.trans_target and args.task == 'regression':
+        if args.trans_target and args.task_type == 'regression':
             print(f"Applying {args.trans_target} transformation to target...")
             y_series = pd.Series(y.copy())
             
@@ -352,7 +351,7 @@ EXAMPLES:
         # 8. Save the reduced dataset
             
         reduced_data.to_csv(output_path, index=False)
-        print(f"Reduced dataset saved to {output_path}")
+        print(f"Reduced dataset saved.")
         
         # Write report and feature importance files by default unless --no_report is used
         if not args.no_report:
@@ -362,16 +361,16 @@ EXAMPLES:
             # Generate the feature importance CSV file
             # Shorter but still descriptive file name
             # Use shorter classification abbreviation
-            task_abbr = "classif" if args.task == "classification" else args.task
+            task_abbr = "classif" if args.task_type == "classification" else args.task_type
             mi_file_path = f"{input_path.stem}_MI{args.k}_{task_abbr}_feature_scores.csv"
             mi_file_full_path = os.path.join(output_dir if output_dir else ".", mi_file_path)
             all_features_mi.to_csv(mi_file_path, index=False)
-            print(f"Feature importance rankings saved to {mi_file_full_path}")
+            print(f"Feature importance rankings saved.")
             
             # Generate detailed report
             # Shorter but still descriptive report name
             # Use shorter classification abbreviation
-            task_abbr = "classif" if args.task == "classification" else args.task
+            task_abbr = "classif" if args.task_type == "classification" else args.task_type
             report_path = f"{input_path.stem}_MI{args.k}_{task_abbr}_report.txt"
             report_full_path = os.path.join(output_dir if output_dir else ".", report_path)
             with open(report_path, 'w') as f:
@@ -395,7 +394,7 @@ EXAMPLES:
                 f.write(f"* Selected top {k} features using mutual information\n")
                 if args.trans_feat:
                     f.write(f"* Applied {args.trans_feat} transformation to features\n")
-                if args.trans_target and args.task == 'regression':
+                if args.trans_target and args.task_type == 'regression':
                     f.write(f"* Applied {args.trans_target} transformation to target\n")
                 f.write("\n")
                 
@@ -426,21 +425,21 @@ EXAMPLES:
                 f.write(f"### Option 1: Visualize CV splits and optimize them for data structure\n")
                 f.write(f"**Default CV splits:**\n")
                 # Basic CV calculator command
-                cv_cmd1 = f"daftar-cv --input {output_path} --id {id_column} --target {args.target}"
+                cv_cmd1 = f"daftar-cv --input {output_path} --sample {id_column} --target {args.target}"
                 if args.output_dir:
                     cv_cmd1 += f" --output_dir {args.output_dir}"
                 f.write(f"{cv_cmd1}\n\n")
                 
                 f.write(f"**Custom CV parameters:**\n")
                 # Custom CV parameters
-                cv_cmd2 = f"daftar-cv --input {output_path} --id {id_column} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER"
+                cv_cmd2 = f"daftar-cv --input {output_path} --sample {id_column} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER"
                 if args.output_dir:
                     cv_cmd2 += f" --output_dir {args.output_dir}"
                 f.write(f"{cv_cmd2}\n\n")
                 
                 f.write(f"### Option 2: Run the full DAFTAR-ML pipeline\n")
                 # Run DAFTAR-ML command
-                run_cmd = f"daftar --input {output_path} --target {args.target} --id {id_column} --model [xgb|rf]"
+                run_cmd = f"daftar --input {output_path} --target {args.target} --sample {id_column} --model [xgb|rf]"
                 if args.output_dir:
                     run_cmd += f" --output_dir {args.output_dir}"
                 f.write(f"{run_cmd}\n")
@@ -456,13 +455,13 @@ EXAMPLES:
         print("===========================================================")
         print("Option 1: Visualize CV splits and optimize them for data structure")
         print(f"  Default CV splits : ")
-        print(f"  daftar-cv --input {output_path} --id {id_column} --target {args.target}{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
+        print(f"  daftar-cv --input {output_path} --sample {id_column} --target {args.target}{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print()
         print(f"  Custom CV parameters:")
-        print(f"  daftar-cv --input {output_path} --id {id_column} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
+        print(f"  daftar-cv --input {output_path} --sample {id_column} --target {args.target} --outer INTEGER --inner INTEGER --repeats INTEGER{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
         print()
         print("Option 2: Run the DAFTAR-ML pipeline with default settings")
-        print(f"  daftar --input {output_path} --target {args.target} --id {id_column} --model [xgb|rf]{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
+        print(f"  daftar --input {output_path} --target {args.target} --sample {id_column} --model [xgb|rf]{' --output_dir ' + str(args.output_dir) if args.output_dir else ''}")
 
         
         return 0

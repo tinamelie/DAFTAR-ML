@@ -10,8 +10,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
 
+from daftar.viz.common import save_plot
+
 from daftar.viz.colors import (
-    CONFUSION_MATRIX_CMAP, REGRESSION_MEAN_LINE_COLOR, 
+    CONFUSION_MATRIX_CMAP, REGRESSION_CV_MEAN_LINE_COLOR, 
     CONFUSION_MATRIX_LINEWIDTH, CONFUSION_MATRIX_LINECOLOR
 )
 
@@ -37,8 +39,7 @@ def create_shap_summary(shap_values: List[np.ndarray],
     plt.figure(figsize=(12, 10))
     shap.summary_plot(combined_values, X, show=False)
     plt.tight_layout()
-    plt.savefig(output_path, bbox_inches='tight')
-    plt.close()
+    save_plot(plt.gcf(), output_path, tight_layout=True)
 
 
 def create_feature_importance(importances: np.ndarray,
@@ -83,13 +84,15 @@ def create_feature_importance(importances: np.ndarray,
 
 def create_prediction_analysis(y_true: List,
                              y_pred: List,
-                             output_path: Path) -> None:
+                             output_path: Path,
+                             config=None) -> None:
     """Create prediction analysis plots.
     
     Args:
         y_true: True values
         y_pred: Predicted values
         output_path: Path to save the plot
+        config: Optional config object with label mapping for classification
     """
     # Convert to numpy arrays
     y_true = np.array(y_true)
@@ -97,6 +100,19 @@ def create_prediction_analysis(y_true: List,
     
     # Check if values are numeric or strings (for classification)
     is_numeric = np.issubdtype(y_true.dtype, np.number) and np.issubdtype(y_pred.dtype, np.number)
+    
+    # For classification with encoded labels, check if we need to decode
+    display_y_true = y_true
+    display_y_pred = y_pred
+    if (config and hasattr(config, 'label_encoder') and 
+        config.label_encoder is not None):
+        # Map encoded labels back to original strings for display
+        try:
+            display_y_true = config.label_encoder.inverse_transform(y_true)
+            display_y_pred = config.label_encoder.inverse_transform(y_pred)
+            is_numeric = False  # Force classification display
+        except Exception as e:
+            print(f"Warning: Could not decode labels for display: {e}")
     
     if is_numeric:
         # For regression tasks
@@ -115,7 +131,7 @@ def create_prediction_analysis(y_true: List,
         
         # Plot 2: Residuals
         axes[1].scatter(y_true, residuals, alpha=0.5)
-        axes[1].axhline(y=0, color=REGRESSION_MEAN_LINE_COLOR, linestyle='--')
+        axes[1].axhline(y=0, color=REGRESSION_CV_MEAN_LINE_COLOR, linestyle='--')
         axes[1].set_xlabel('Actual')
         axes[1].set_ylabel('Residual (Predicted - Actual)')
         axes[1].set_title('Residual Plot')
@@ -123,11 +139,11 @@ def create_prediction_analysis(y_true: List,
         # For classification tasks
         from sklearn.metrics import confusion_matrix
         
-        # Get unique classes
-        classes = np.unique(np.concatenate((y_true, y_pred)))
+        # Get unique classes for display
+        classes = np.unique(np.concatenate((display_y_true, display_y_pred)))
         
-        # Create confusion matrix plot
-        cm = confusion_matrix(y_true, y_pred, labels=classes)
+        # Create confusion matrix plot using display labels
+        cm = confusion_matrix(display_y_true, display_y_pred, labels=classes)
         
         # Single plot for classification
         fig, ax = plt.subplots(figsize=(10, 8))
