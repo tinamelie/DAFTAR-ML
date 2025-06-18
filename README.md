@@ -54,7 +54,7 @@ daftar-cv --input preprocessed.csv --target Growth_Rate --sample Species
 ```
 
 ### 3. Main Pipeline
-Executes the pipeline
+Executes the pipeline (with XGBoost)
 ```bash
 daftar --input preprocessed.csv --target Growth_Rate --sample Species --model xgb
 ```
