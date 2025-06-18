@@ -29,11 +29,15 @@ dependencies = [
     "joblib>=1.1.0",
     "tqdm>=4.64.0",
     "plotly>=5.24.1",
-    "python-louvain>=0.16",
+    "scipy>=1.7.0",
+    "networkx>=2.6.0",
 ]
 
 [project.urls]
+Homepage = "https://github.com/tinamelie/DAFTAR-ML"
 Repository = "https://github.com/tinamelie/DAFTAR-ML"
+Issues = "https://github.com/tinamelie/DAFTAR-ML/issues"
+Documentation = "https://github.com/tinamelie/DAFTAR-ML/blob/main/WIKI.md"
 
 [project.scripts]
 daftar = "daftar.cli:main"
