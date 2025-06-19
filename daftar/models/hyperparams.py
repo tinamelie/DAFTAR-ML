@@ -71,7 +71,7 @@ def _get_default_hyperparams() -> Dict[str, Any]:
     return {
         'random_forest': {
             'n_estimators': {'min': 100, 'max': 1000},
-            'max_depth': {'min': 3, 'max': 30},
+            'max_depth': {'min': 3, 'max': 20},
             'min_samples_leaf': {'min': 1, 'max': 10},
             'max_features': {'min': 0.1, 'max': 0.8},
             'min_samples_split': {'min': 2, 'max': 10},
@@ -86,7 +86,8 @@ def _get_default_hyperparams() -> Dict[str, Any]:
             'learning_rate': {'min': 0.01, 'max': 0.4},
             'subsample': {'min': 0.5, 'max': 1.0},
             'colsample_bytree': {'min': 0.5, 'max': 1.0},
-            'min_child_weight': {'min': 1, 'max': 10}
+            'min_child_weight': {'min': 1, 'max': 10},
+            'gamma': {'min': 0, 'max': 0.5}
         }
     }
 

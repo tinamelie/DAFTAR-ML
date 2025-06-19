@@ -44,3 +44,6 @@ xgboost:
   min_child_weight:  # Minimum sum of instance weight needed in a child
     min: 1
     max: 10
+  gamma:           # Minimum loss reduction required to make a split (regularization)
+    min: 0
+    max: 0.5
