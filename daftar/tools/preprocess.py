@@ -76,7 +76,7 @@ EXAMPLES:
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     
     # Update the usage message
-    parser._optionals.title = "Other optional arguments"
+    parser._optionals.title = "options"
     parser._actions[0].help = "Show this help message and exit"
     
     args = parser.parse_args()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Nested CV target-distribution visualiser.
+Nested CV target-distribution visualizer.
 """
 
 from __future__ import annotations
@@ -627,7 +627,7 @@ def build_daftar_command(args: argparse.Namespace, seed: int, is_classification:
 def get_args() -> argparse.Namespace:
     """Parse command line arguments and return the parsed namespace object."""
     p = argparse.ArgumentParser(
-        description="Visualise target values across nested CV splits.",
+        description="Visualize target values across nested CV splits.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         allow_abbrev=False,
         usage="daftar-cv [-h] --input PATH --target COLUMN --sample COLUMN [--outer INTEGER] [--inner INTEGER] [--repeats INTEGER] [--seed INTEGER] [--stratify {true,false}] [--task_type {classification,regression}] [--output_dir PATH] [--force] [--granular] [--alpha FLOAT]",
@@ -645,7 +645,7 @@ def get_args() -> argparse.Namespace:
     cv = p.add_argument_group("Cross‑validation")
     task = p.add_argument_group("Task Type")
     out = p.add_argument_group("Output")
-    viz = p.add_argument_group("Visualization")
+    viz = p.add_argument_group("Statistical Thresholds")
 
     req.add_argument("--input", required=True, metavar="PATH", help="Path to CSV data file")
     req.add_argument("--target", required=True, metavar="COLUMN", help="Target column name")
