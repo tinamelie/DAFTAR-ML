@@ -6,6 +6,8 @@ DAFTAR-ML identifies which features in your dataset have the strongest relations
 
 **Pipeline Features**: Data preprocessing, support for regression and classification, automated hyperparameter optimization, nested cross-validation, SHAP (SHapley Additive exPlanations) feature analysis, and publication-quality visualizations.
 
+**For comprehensive documentation, tutorials, and advanced usage examples, see the [DAFTAR-ML Wiki](WIKI.md).**
+
 ## Quick Start (Minimal Example)
 Installation:
 ```bash
@@ -15,7 +17,8 @@ pip install git+https://github.com/tinamelie/DAFTAR-ML.git
 Preprocess and run: 
 ```bash
 daftar-preprocess --input raw.csv --target Growth_rate --sample Species
-
+```
+```bash
 daftar --input preprocessed.csv --target Growth_rate --sample Species --model xgb
 ```
 
@@ -69,11 +72,11 @@ daftar --input preprocessed.csv --target Growth_Rate --sample Species --model xg
 
 In these results, Gene_cluster2 has the highest SHAP score, indicating it contributes most to a higher growth rate.
 
-### Interpreting Your Results
+## Interpreting Your Results
 
-For most applications, **top_shap_bar_plot.png** provides the best balance between interpretability and statistical robustness, indicating which features are important and how they influence predictions.
+A good overview of your results can be found in **top_shap_bar_plot.png**. This plot shows the most important features (by SHAP value) and their influence on predictions. 
 
-**For comprehensive documentation, tutorials, and advanced usage examples, see the [DAFTAR-ML Wiki](WIKI.md).**
+![top_shap_bar_plot.png](https://github.com/tinamelie/DAFTAR-ML/blob/main/misc/top_shap_bar_plot.png "top_shap_bar_plot.png")
 
 ## Installation
 
