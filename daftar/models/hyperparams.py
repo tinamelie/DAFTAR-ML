@@ -86,8 +86,7 @@ def _get_default_hyperparams() -> Dict[str, Any]:
             'learning_rate': {'min': 0.01, 'max': 0.4},
             'subsample': {'min': 0.5, 'max': 1.0},
             'colsample_bytree': {'min': 0.5, 'max': 1.0},
-            'min_child_weight': {'min': 1, 'max': 10},
-            'gamma': {'min': 0, 'max': 5}
+            'min_child_weight': {'min': 1, 'max': 10}
         }
     }
 
