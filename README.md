@@ -3,7 +3,8 @@
 ## **D**ata **A**gnostic **F**eature-**T**arget **A**nalysis & **R**anking **M**achine **L**earning Pipeline
 
 DAFTAR-ML identifies which features in your dataset have the strongest relationship to your target variable using machine learning and SHAP analysis. Unlike standard ML pipelines that focus on prediction accuracy, DAFTAR-ML focuses on feature ranking and interpretation.
-Pipeline Features**: Data preprocessing, support for regression and classification, automated hyperparameter optimization, nested cross-validation, SHAP (SHapley Additive exPlanations) feature analysis, and publication-quality visualizations.
+
+**Pipeline Features**: Data preprocessing, support for regression and classification, automated hyperparameter optimization, nested cross-validation, SHAP (SHapley Additive exPlanations) feature analysis, and publication-quality visualizations.
 
 ## Quick Start (Minimal Example)
 Installation:
