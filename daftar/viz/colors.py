@@ -97,7 +97,7 @@ def _get_default_colors() -> Dict[str, Any]:
             ],
             "background": "#F8F8F8"
         },
-        "regression": {
+        "regression_cv": {
             "main": "#0c2c84",
             "mean_line": "#8a994e",
             "hist_alpha": 0.6,
@@ -123,16 +123,16 @@ def _get_default_colors() -> Dict[str, Any]:
             "negative": "#32748E",
             "background": "#FAFAFA",
             "interactions": {
-                "link_color": "#1E88E5",
-                "network_node_color": "#1E88E5",
+                "heatmap_cmap": "viridis",
+                "network_node_cmap": "RdBu_r",
                 "network_edge_color": "#999999"
             }
         },
 
         "confusion_matrix": {
-            "cmap": "Blues",
-            "linewidth": 0.5,
-            "linecolor": "#cccccc"
+            "cmap": "RdBu_r",
+            "linewidth": 2,
+            "linecolor": "black"
         },
     }
 

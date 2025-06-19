@@ -288,9 +288,9 @@ def save_mean_shap_analysis(fold_results, main_output_dir, prefix="Mean", proble
     
     # Update title to clearly indicate top/bottom features if both are present
     if len(neg_fold) > 0 and len(pos_fold) > 0:
-        ax.set_title(f"SHAP Values (Top {min(top_n, len(pos_fold))} Positive & Top {min(top_n, len(neg_fold))} Negative Features)")
+        ax.set_title(f"Top {min(top_n, len(pos_fold))} Positive & Top {min(top_n, len(neg_fold))} Negative Features by SHAP Magnitude")
     else:
-        ax.set_title(f"SHAP Values (Top {top_n} Features)")
+        ax.set_title(f"Top {top_n} Features by SHAP Magnitude")
     
     ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
     ax.grid(axis="y", visible=False)
@@ -425,6 +425,9 @@ def create_absolute_sorted_bar_plot(fold_df, main_output_dir, pos_color, neg_col
     # Create plot
     fig, ax = plt.subplots(figsize=(10, max(6, len(abs_fold_df) * 0.25)))
     
+    # Set background color to match top_shap_bar_pos_neg.png
+    ax.set_facecolor(SHAP_BG_COLOR)
+    
     # Set up y-coordinates
     ys = np.arange(len(abs_fold_df))
     
@@ -479,7 +482,7 @@ def create_absolute_sorted_bar_plot(fold_df, main_output_dir, pos_color, neg_col
     # Set labels and grid
     ax.set_xlabel("SHAP Value")
     ax.set_ylabel("Feature")
-    ax.set_title(f"SHAP Values (Top {top_n} Features by Magnitude)")
+    ax.set_title(f"Top {top_n} Features by SHAP Magnitude")
     
     ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
     ax.grid(axis="y", visible=False)
