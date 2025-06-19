@@ -327,7 +327,7 @@ def plot_interaction_heatmap(
         cbar_kws={'label': 'SHAP Interaction Strength'}
     )
     
-    plt.title(f'SHAP Feature Interactions Heatmap\n(Top {len(display_names)} Features by Magnitude)')
+    plt.title(f'Feature Interactions Heatmap\n(Top {len(display_names)} Features by SHAP Magnitude)')
     plt.tight_layout()
     fig = plt.gcf()
     save_plot(fig, output_path, tight_layout=False)

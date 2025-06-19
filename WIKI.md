@@ -381,7 +381,7 @@ When using tree-based regression models (XGBoost and Random Forest regression), 
 
 **Output Files:**
 * `interaction_network.png`: Network of top 20 strongest feature interactions
-* `interaction_heatmap.png`: Heatmap showing the top 20 features by interaction strength
+* `interaction_.png`: Heatmap showing the top 20 features by interaction strength
 * `top_bottom_network.png`: Network showing interactions between the 10 most positive and 10 most negative SHAP-scored features
 * `interaction_matrix.csv`: Full numerical interaction matrix for all computed interactions
 
