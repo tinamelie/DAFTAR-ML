@@ -11,9 +11,7 @@ random_forest:
   max_depth:       # Maximum depth of trees
     min: 3
     max: 20
-  min_samples_split:  # Minimum samples required to split a node
-    min: 2
-    max: 10
+
   min_samples_leaf:   # Minimum samples required in a leaf node
     min: 1
     max: 10
@@ -33,10 +31,10 @@ xgboost:
     max: 1000
   max_depth:       # Maximum depth of trees
     min: 3
-    max: 12
+    max: 20
   learning_rate:   # Step size shrinkage used to prevent overfitting
-    min: 0.01
-    max: 0.3
+    min: 0.5
+    max: 1.0
   subsample:       # Subsample ratio of training instances
     min: 0.5
     max: 1.0
@@ -46,3 +44,6 @@ xgboost:
   min_child_weight:  # Minimum sum of instance weight needed in a child
     min: 1
     max: 10
+  gamma:           # Minimum loss reduction required to make a split (regularization)
+    min: 0
+    max: 1

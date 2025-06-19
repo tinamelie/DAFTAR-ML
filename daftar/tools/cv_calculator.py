@@ -645,7 +645,7 @@ def get_args() -> argparse.Namespace:
     cv = p.add_argument_group("Cross‑validation")
     task = p.add_argument_group("Task Type")
     out = p.add_argument_group("Output")
-    viz = p.add_argument_group("Statistical Thresholds")
+    viz = p.add_argument_group("Visualization")
 
     req.add_argument("--input", required=True, metavar="PATH", help="Path to CSV data file")
     req.add_argument("--target", required=True, metavar="COLUMN", help="Target column name")

@@ -71,11 +71,10 @@ def _get_default_hyperparams() -> Dict[str, Any]:
     return {
         'random_forest': {
             'n_estimators': {'min': 100, 'max': 1000},
-            'max_depth': {'min': 3, 'max': 20},
-            'min_samples_split': {'min': 2, 'max': 10},
+            'max_depth': {'min': 3, 'max': 30},
             'min_samples_leaf': {'min': 1, 'max': 10},
-            'max_features': {'min': 0.1, 'max': 1.0},
-            'bootstrap': {'choices': [True, False]},
+            'max_features': {'min': 0.1, 'max': 0.8},
+            'min_samples_split': {'min': 2, 'max': 10},
             'criterion': {
                 'classification': ['gini', 'entropy'],
                 'regression': ['squared_error', 'absolute_error']
@@ -83,11 +82,12 @@ def _get_default_hyperparams() -> Dict[str, Any]:
         },
         'xgboost': {
             'n_estimators': {'min': 100, 'max': 1000},
-            'max_depth': {'min': 3, 'max': 12},
-            'learning_rate': {'min': 0.01, 'max': 0.3},
+            'max_depth': {'min': 3, 'max': 20},
+            'learning_rate': {'min': 0.01, 'max': 0.4},
             'subsample': {'min': 0.5, 'max': 1.0},
             'colsample_bytree': {'min': 0.5, 'max': 1.0},
-            'min_child_weight': {'min': 1, 'max': 10}
+            'min_child_weight': {'min': 1, 'max': 10},
+            'gamma': {'min': 0, 'max': 5}
         }
     }
 
@@ -118,7 +118,7 @@ def get_hyperparameter_space(trial, model_type: str, task_type: str = None) -> D
     
     # Map hyperparameters to trial suggestions
     for param_name, param_range in space.items():
-        if param_name in ['n_estimators', 'max_depth', 'min_samples_split', 
+        if param_name in ['n_estimators', 'max_depth', 'min_samples_split',
                         'min_samples_leaf', 'min_child_weight']:
             # Integer parameters
             params[param_name] = trial.suggest_int(
