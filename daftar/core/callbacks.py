@@ -58,8 +58,8 @@ class RelativeEarlyStoppingCallback:
             elif abs(value) >= 0.001:
                 return f"{value:.10f}"
             else:
-                # For extremely small values, use scientific notation
-                return f"{value:.2e}"
+                # For extremely small values, use scientific notation with higher precision
+                return f"{value:.6e}"
         
         # First trial
         if self.best_value is None:
