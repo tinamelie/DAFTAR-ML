@@ -9,13 +9,18 @@ import os
 import sys
 import yaml
 import warnings
+import signal
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 
 from daftar.core.config import Config
 from daftar.core.pipeline import Pipeline
 from daftar.utils.warnings import suppress_xgboost_warnings
+from daftar.models.hyperparams import clear_hyperparams_cache
 import daftar  # For version information
+
+# Clear hyperparameters cache on startup to ensure fresh config
+clear_hyperparams_cache()
 
 # Suppress XGBoost warnings globally
 suppress_xgboost_warnings()
@@ -28,6 +33,17 @@ PINK = '\033[95m'
 BRIGHT_GREEN = '\033[92;1m'
 BOLD = '\033[1m'
 RESET = '\033[0m'
+
+
+def signal_handler(sig, frame):
+    """Handle keyboard interrupt (Ctrl+C) gracefully."""
+    print(f"\n{YELLOW}Pipeline interrupted by user (Ctrl+C){RESET}")
+    print("Cleaning up and exiting...")
+    sys.exit(0)
+
+
+# Set up signal handler for keyboard interrupt
+signal.signal(signal.SIGINT, signal_handler)
 
 # Custom formatter that doesn't show defaults for required arguments
 class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):

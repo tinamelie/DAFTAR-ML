@@ -23,6 +23,12 @@ random_forest:
   criterion:          # Function to measure the quality of a split
     classification: ["gini", "entropy"]
     regression: ["squared_error", "absolute_error"]
+  # max_leaf_nodes:    # Grow trees with max_leaf_nodes in best-first fashion
+  #   min: 10
+  #   max: 1000
+  # min_impurity_decrease:  # Minimum impurity decrease required to make a split
+  #   min: 0.0
+  #   max: 0.1
 
 # XGBoost hyperparameters
 xgboost:
@@ -44,6 +50,12 @@ xgboost:
   min_child_weight:  # Minimum sum of instance weight needed in a child
     min: 1
     max: 10
-  gamma:           # Minimum loss reduction required to make a split (regularization)
-    min: 0
-    max: 0.5
+  # gamma:           # Minimum loss reduction required to make a split (regularization)
+  #   min: 0
+  #   max: 0.3
+  # reg_alpha:       # L1 regularization term on weights
+  #   min: 0
+  #   max: 1.0
+  # reg_lambda:      # L2 regularization term on weights
+  #   min: 0
+  #   max: 1.0

@@ -26,6 +26,12 @@ DEFAULT_CONFIG_PATH = Path(__file__).parent / 'hyperparams.yaml'
 _hyperparams_cache = None
 
 
+def clear_hyperparams_cache():
+    """Clear the hyperparameters cache to force reloading from file."""
+    global _hyperparams_cache
+    _hyperparams_cache = None
+
+
 def load_hyperparams(config_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     Load hyperparameters from the configuration file.
@@ -71,14 +77,16 @@ def _get_default_hyperparams() -> Dict[str, Any]:
     return {
         'random_forest': {
             'n_estimators': {'min': 100, 'max': 1000},
-            'max_depth': {'min': 3, 'max': 20},
+            'max_depth': {'min': 3, 'max': 30},
             'min_samples_leaf': {'min': 1, 'max': 10},
             'max_features': {'min': 0.1, 'max': 0.8},
             'min_samples_split': {'min': 2, 'max': 10},
             'criterion': {
                 'classification': ['gini', 'entropy'],
                 'regression': ['squared_error', 'absolute_error']
-            }
+            },
+            # 'max_leaf_nodes': {'min': 10, 'max': 1000},
+            # 'min_impurity_decrease': {'min': 0.0, 'max': 0.1}
         },
         'xgboost': {
             'n_estimators': {'min': 100, 'max': 1000},
@@ -87,7 +95,9 @@ def _get_default_hyperparams() -> Dict[str, Any]:
             'subsample': {'min': 0.5, 'max': 1.0},
             'colsample_bytree': {'min': 0.5, 'max': 1.0},
             'min_child_weight': {'min': 1, 'max': 10},
-            'gamma': {'min': 0, 'max': 0.5}
+            # 'gamma': {'min': 0, 'max': 0.3},
+            # 'reg_alpha': {'min': 0, 'max': 1.0},
+            # 'reg_lambda': {'min': 0, 'max': 1.0}
         }
     }
 
@@ -104,6 +114,9 @@ def get_hyperparameter_space(trial, model_type: str, task_type: str = None) -> D
     Returns:
         Dictionary with hyperparameters for Optuna trials
     """
+    # Clear cache to ensure fresh loading
+    clear_hyperparams_cache()
+    
     # Load hyperparameters
     hyperparams = load_hyperparams()
     
@@ -141,7 +154,7 @@ def get_hyperparameter_space(trial, model_type: str, task_type: str = None) -> D
                 )
             # If task_type is not specified or not found, skip this parameter
         else:
-            # Float parameters
+            # Float parameters (including gamma)
             params[param_name] = trial.suggest_float(
                 param_name, 
                 param_range['min'], 
