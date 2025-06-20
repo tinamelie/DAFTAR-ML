@@ -479,6 +479,8 @@ class Pipeline:
                 else:
                     self.logger.warning(f"[Fold {fold_idx}] Failed to compute SHAP interactions")
                     
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 self.logger.warning(f"[Fold {fold_idx}] SHAP interactions computation failed: {e}")
                 # Continue without interactions - don't fail the entire fold

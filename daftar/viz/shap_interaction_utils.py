@@ -149,6 +149,9 @@ def compute_fold_shap_interactions(
     
     try:
         import shap
+        import signal
+        import threading
+        import time
         
         # Convert DataFrame to numpy array for SHAP computation
         X_test_array = X_test_df.values
@@ -157,7 +160,39 @@ def compute_fold_shap_interactions(
         # Use TreeExplainer directly for simplicity and reliability
         (f"Fold {fold_idx}: Computing SHAP interactions using TreeExplainer (direct)")
         explainer = shap.TreeExplainer(underlying_model)
-        interaction_values = explainer.shap_interaction_values(X_test_array)
+        
+        # Set up interruption handling for SHAP computation
+        result_container = []
+        exception_container = []
+        
+        def compute_shap_interactions():
+            try:
+                result = explainer.shap_interaction_values(X_test_array)
+                result_container.append(result)
+            except Exception as e:
+                exception_container.append(e)
+        
+        # Start computation in separate thread
+        compute_thread = threading.Thread(target=compute_shap_interactions)
+        compute_thread.daemon = True
+        compute_thread.start()
+        
+        # Poll for completion or interruption
+        while compute_thread.is_alive():
+            try:
+                compute_thread.join(timeout=0.1)  # Check every 100ms
+            except KeyboardInterrupt:
+                # Force thread termination is not safe, but we can raise immediately
+                raise KeyboardInterrupt()
+        
+        # Check if computation completed successfully
+        if exception_container:
+            raise exception_container[0]
+        
+        if not result_container:
+            raise RuntimeError("SHAP computation failed without exception")
+        
+        interaction_values = result_container[0]
         
         # Validate interaction values shape - should be (n_samples, n_features, n_features) for regression
         LOGGER.debug(f"Fold {fold_idx}: Raw interaction values shape: {interaction_values.shape}")
@@ -195,6 +230,8 @@ def compute_fold_shap_interactions(
         (f"Fold {fold_idx}: Successfully computed {len(interactions_df)} interactions")
         return interactions_df, interaction_matrix, feature_names
         
+    except KeyboardInterrupt:
+        raise
     except Exception as e:
         LOGGER.error(f"Fold {fold_idx}: Failed to compute interactions: {e}")
         return None

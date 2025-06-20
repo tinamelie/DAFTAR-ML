@@ -154,7 +154,7 @@ If you use DAFTAR-ML in academic work, please cite:
   title   = {DAFTAR-ML},
   year    = {2025},
   url     = {https://github.com/tinamelie/DAFTAR-ML},
-  version = {v0.2.5}
+  version = {v0.2.6}
 }
 ```
 
