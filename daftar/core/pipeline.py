@@ -321,35 +321,35 @@ class Pipeline:
     ) -> Dict[str, Any]:
         # Initialize fold results dictionary
         fold_res = {"fold_studies": {}}
+        
+        # Create fold directory
+        fold_dir = self.output_dir / f"fold_{fold_idx}"
+        fold_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Print and log fold info
+        print(f"\n{self.CYAN}Processing fold {fold_idx}...{self.RESET}")
+        self.logger.info(f"Processing fold {fold_idx}")
+        
+        # ------------------------------------------------ data
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
         
-        output_dir = self.config.get_output_dir()
-        output_dir.mkdir(exist_ok=True, parents=True)
-        fold_dir = output_dir / f"fold_{fold_idx}"
-        fold_dir.mkdir(exist_ok=True, parents=True)
+        # Create inner CV for hyperparameter tuning
+        if self.config.problem_type == "classification" and self.config.use_stratified:
+            inner_cv = StratifiedKFold(
+                n_splits=self.config.inner_folds, shuffle=True, random_state=self.config.seed
+            )
+        else:
+            inner_cv = KFold(
+                n_splits=self.config.inner_folds, shuffle=True, random_state=self.config.seed
+            )
         
+        # ------------------------------------------------ model
+        print(f"{self.CYAN}  Training model with hyperparameter optimization...{self.RESET}")
         model = self._create_model()
-        
-        # Create inner CV splitter for proper train/validation split during hyperparameter tuning
-        from daftar.tools.cv_calculator import get_inner_cv_splitter
-        inner_cv = get_inner_cv_splitter(
-            task_type=self.config.problem_type,
-            n_splits=self.config.inner_folds,
-            use_stratification=(self.config.problem_type == "classification"),
-            random_state=self.config.seed
-        )
-        
-        # Pass inner CV splitter to the model's fit method
-        model.fit(X_train, y_train, inner_cv=inner_cv)
-        
-        print(f"{self.CYAN}  Hyperparameter tuning complete. Now evaluating best model on test set...{self.RESET}")
-        
-        # SHAP interactions will be calculated later in the dedicated function
-        # This avoids duplicate computation and memory issues
+        model.fit(X_train, y_train, inner_cv)
         
         # ------------------------------------------------ predictions
-        # Generate predictions on test set
         y_pred = model.predict(X_test)
         
         # For classification, also get probabilities if available
@@ -385,6 +385,58 @@ class Pipeline:
         except Exception as e:
             self.logger.warning(f"Could not save per-fold feature importance: {e}")
         
+        # ------------------------------------------------ ids / predictions csv
+        # Save predictions immediately after computing them
+        ids = test_idx.tolist()
+        original_ids = self._get_original_ids(test_idx)
+        
+        save_fold_predictions_vs_actual(
+            fold_idx,
+            ids,
+            y_pred,
+            y_test,
+            self.output_dir,
+            original_ids=original_ids,
+            problem_type=self.config.problem_type,
+            config=self.config,
+        )
+        
+        # ------------------------------------------------ persist model
+        # Save model immediately after training
+        model_path = fold_dir / f"best_model_fold_{fold_idx}.pkl"
+        with open(model_path, "wb") as f:
+            pickle.dump(model, f)
+        
+        # ------------------------------------------------ Optuna figures
+        # Save Optuna visualizations immediately
+        if hasattr(model, "study"):
+            # Save study object for later summary
+            fold_res["fold_studies"][fold_idx] = model.study
+            
+            # Generate individual fold visualizations
+            save_optuna_visualizations(
+                model.study, fold_idx, self.output_dir, self.config
+            )
+        
+        # ------------------------------------------------ basic visualizations
+        # Create basic visualizations immediately
+        print(f"{self.CYAN}  Creating basic visualization plots...{self.RESET}")
+        
+        # ------------------------------------------------ density plot (regression only)
+        if self.config.problem_type == "regression":
+            try:
+                self._create_fold_density_plot(fold_idx, y_test, y_pred, fold_dir, self.config.target)
+            except Exception as e:
+                self.logger.warning(f"Failed to create density plot for fold {fold_idx}: {e}")
+        
+        # ------------------------------------------------ helper visuals
+        self._create_fold_distribution_histogram(
+            fold_idx, y_train, y_test, fold_dir
+        )
+        self._save_fold_samples_list(
+            fold_idx, train_idx, test_idx, y, fold_dir, original_ids
+        )
+        
         # ------------------------------------------------ SHAP
         print(f"{self.CYAN}  Analyzing feature importance with SHAP values...{self.RESET}")
         shap_values = None
@@ -414,7 +466,7 @@ class Pipeline:
                 
                 # Compute interactions for this fold
                 interaction_result = compute_fold_shap_interactions(
-                    temp_fold_result, fold_idx, output_dir
+                    temp_fold_result, fold_idx, self.output_dir
                 )
                 
                 if interaction_result is not None:
@@ -430,55 +482,6 @@ class Pipeline:
             except Exception as e:
                 self.logger.warning(f"[Fold {fold_idx}] SHAP interactions computation failed: {e}")
                 # Continue without interactions - don't fail the entire fold
-        
-        # ------------------------------------------------ Optuna figures
-        if hasattr(model, "study"):
-            # Save study object for later summary
-            fold_res["fold_studies"][fold_idx] = model.study
-            
-            # Generate individual fold visualizations
-            save_optuna_visualizations(
-                model.study, fold_idx, output_dir, self.config
-            )
-        
-        # ------------------------------------------------ persist model
-        model_path = fold_dir / f"best_model_fold_{fold_idx}.pkl"
-        with open(model_path, "wb") as f:
-            pickle.dump(model, f)
-        
-        
-        # ------------------------------------------------ ids / predictions csv
-        ids = test_idx.tolist()
-        original_ids = self._get_original_ids(test_idx)
-        
-        save_fold_predictions_vs_actual(
-            fold_idx,
-            ids,
-            y_pred,
-            y_test,
-            output_dir,
-            original_ids=original_ids,
-            problem_type=self.config.problem_type,
-            config=self.config,
-        )
-        
-        # ------------------------------------------------ visualizations
-        print(f"{self.CYAN}  Creating visualization plots...{self.RESET}")
-        
-        # ------------------------------------------------ density plot (regression only)
-        if self.config.problem_type == "regression":
-            try:
-                self._create_fold_density_plot(fold_idx, y_test, y_pred, fold_dir, self.config.target)
-            except Exception as e:
-                self.logger.warning(f"Failed to create density plot for fold {fold_idx}: {e}")
-        
-        # ------------------------------------------------ helper visuals
-        self._create_fold_distribution_histogram(
-            fold_idx, y_train, y_test, fold_dir
-        )
-        self._save_fold_samples_list(
-            fold_idx, train_idx, test_idx, y, fold_dir, original_ids
-        )
                 
         # ------------------------------------------------ result dict
         result = dict(
@@ -552,7 +555,7 @@ class Pipeline:
             metrics_df = pd.DataFrame(metrics_dict)
         
         # Create combined metrics file for this fold
-        combine_metrics_for_fold(fold_dir, fold_idx, metrics_df)
+        combine_metrics_for_fold(fold_dir, fold_idx, metrics_df, self.config)
         
         # Add metrics to predictions CSV for better integration
         self._add_metrics_to_predictions_csv(fold_idx, fold_dir, metrics)
@@ -916,7 +919,7 @@ class Pipeline:
         # -------------------------------------------- combine metrics files
         # Create combined metrics table with test metrics and hyperparameter tuning metrics
         if hasattr(self, 'test_metrics_df'):
-            combined_metrics_path = combine_metrics_files(output_dir, self.test_metrics_df)
+            combined_metrics_path = combine_metrics_files(output_dir, self.test_metrics_df, self.config)
             if combined_metrics_path:
                 output_files["metrics_all"] = str(combined_metrics_path)
         

@@ -8,7 +8,7 @@ import numpy as np
 from typing import Optional, Dict, Any, List, Union
 
 
-def combine_metrics_for_fold(fold_dir: Path, fold_idx: int, test_metrics_df: pd.DataFrame) -> Path:
+def combine_metrics_for_fold(fold_dir: Path, fold_idx: int, test_metrics_df: pd.DataFrame, config=None) -> Path:
     """
     Create a combined metrics file for a specific fold that includes both test metrics
     and hyperparameter tuning metrics in the same format as metrics_all_folds.csv.
@@ -17,6 +17,7 @@ def combine_metrics_for_fold(fold_dir: Path, fold_idx: int, test_metrics_df: pd.
         fold_dir: Path to the fold directory
         fold_idx: Fold index
         test_metrics_df: DataFrame containing test metrics for this fold
+        config: Configuration object containing the user-selected metric
         
     Returns:
         Path to the created combined metrics file
@@ -28,8 +29,14 @@ def combine_metrics_for_fold(fold_dir: Path, fold_idx: int, test_metrics_df: pd.
     headers = ['Fold', 'TEST METRICS BY FOLD', '', '', '', 'HYPERPARAMETER TUNING METRICS', '', '', '']
     combined_df = pd.DataFrame(columns=headers)
     
-    # Add subheaders
-    subheaders = ['', 'mse', 'rmse', 'mae', 'r2', 'Training MSE', 'Validation MSE', 'Gap', 'Hyperparameters']
+    # Determine the user-selected metric for training/validation headers
+    user_metric = getattr(config, 'metric', 'mse') if config else 'mse'
+    metric_display = user_metric.upper()
+    if metric_display == 'R2':
+        metric_display = 'R2'  # Use R2 instead of R² for CSV compatibility
+    
+    # Add subheaders with user-selected metric
+    subheaders = ['', 'mse', 'rmse', 'mae', 'r2', f'Training {metric_display}', f'Validation {metric_display}', 'Gap', 'Hyperparameters']
     combined_df.loc[0] = subheaders
     
     # Check if we have hyperparameter tuning data for this fold
@@ -42,7 +49,7 @@ def combine_metrics_for_fold(fold_dir: Path, fold_idx: int, test_metrics_df: pd.
     if hp_tuning_file.exists():
         # Extract parameters from the hyperparameter tuning summary file
         try:
-            with open(hp_tuning_file, 'r') as f:
+            with open(hp_tuning_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 
                 # Extract training and validation metrics and gap
@@ -92,13 +99,13 @@ def combine_metrics_for_fold(fold_dir: Path, fold_idx: int, test_metrics_df: pd.
     new_row = [fold_idx, mse, rmse, mae, r2, training_mse, validation_mse, gap, hyperparameters]
     combined_df.loc[1] = new_row
     
-    # Save to file
-    combined_df.to_csv(metrics_file_path, index=False)
+    # Save to file with UTF-8 encoding to handle R² symbol properly
+    combined_df.to_csv(metrics_file_path, index=False, encoding='utf-8')
     
     return metrics_file_path
 
 
-def combine_metrics_files(output_dir: Path, test_metrics_df=None) -> Path:
+def combine_metrics_files(output_dir: Path, test_metrics_df=None, config=None) -> Path:
     """
     Combine hyperparameter tuning metrics and test metrics into a single horizontal table.
     This file is saved as metrics_all_folds.csv.
@@ -106,6 +113,7 @@ def combine_metrics_files(output_dir: Path, test_metrics_df=None) -> Path:
     Args:
         output_dir: Path to the directory containing the metrics files
         test_metrics_df: Optional DataFrame containing test metrics (if provided, no file is read)
+        config: Configuration object containing the user-selected metric
         
     Returns:
         Path to the created combined metrics file
@@ -169,14 +177,31 @@ def combine_metrics_files(output_dir: Path, test_metrics_df=None) -> Path:
     headers = ['Fold', 'TEST METRICS BY FOLD', '', '', '', 'HYPERPARAMETER TUNING METRICS', '', '', '']
     combined_df = pd.DataFrame(columns=headers)
     
+    # Determine the user-selected metric for training/validation headers
+    user_metric = getattr(config, 'metric', None) if config else None
+    
     # Add subheaders
     # Determine if we're dealing with regression or classification based on metrics present
     is_regression = 'mse' in fold_rows.columns
     
     if is_regression:
-        subheaders = ['', 'mse', 'rmse', 'mae', 'r2', 'Training MSE', 'Validation MSE', 'Gap', 'Hyperparameters']
+        # For regression, use the user-selected metric or default to MSE
+        if user_metric:
+            metric_display = user_metric.upper()
+            if metric_display == 'R2':
+                metric_display = 'R2'  # Use R2 instead of R² for CSV compatibility
+        else:
+            metric_display = 'MSE'
+        subheaders = ['', 'mse', 'rmse', 'mae', 'r2', f'Training {metric_display}', f'Validation {metric_display}', 'Gap', 'Hyperparameters']
     else:  # Classification metrics
-        subheaders = ['', 'accuracy', 'f1', 'roc_auc', '', 'Training Accuracy', 'Validation Accuracy', 'Gap', 'Hyperparameters']
+        # For classification, use the user-selected metric or default to Accuracy
+        if user_metric:
+            metric_display = user_metric.title()  # accuracy -> Accuracy, f1 -> F1, etc.
+            if metric_display == 'Roc_auc':
+                metric_display = 'ROC AUC'
+        else:
+            metric_display = 'Accuracy'
+        subheaders = ['', 'accuracy', 'f1', 'roc_auc', '', f'Training {metric_display}', f'Validation {metric_display}', 'Gap', 'Hyperparameters']
     
     combined_df.loc[0] = subheaders
     
@@ -214,12 +239,22 @@ def combine_metrics_files(output_dir: Path, test_metrics_df=None) -> Path:
                         tuning_row['Hyperparameters'].values[0]])
                 else:
                     # For classification, use different metrics if available
-                    # Safely handle potential string or Series values
-                    train_metric = tuning_row.get('Training Accuracy', tuning_row.get('Training MSE', '').values[0] if hasattr(tuning_row.get('Training MSE', ''), 'values') else '')
-                    train_metric = train_metric.values[0] if hasattr(train_metric, 'values') else train_metric
+                    # Safely handle potential string or Series values based on user's selected metric
+                    metric_cols = [f'Training {metric_display}', f'Validation {metric_display}']
                     
-                    val_metric = tuning_row.get('Validation Accuracy', tuning_row.get('Validation MSE', '').values[0] if hasattr(tuning_row.get('Validation MSE', ''), 'values') else '')
-                    val_metric = val_metric.values[0] if hasattr(val_metric, 'values') else val_metric
+                    # Try to get the values for the selected metric, fallback to MSE columns
+                    train_metric = ''
+                    val_metric = ''
+                    
+                    if metric_cols[0] in tuning_row:
+                        train_metric = tuning_row[metric_cols[0]].values[0] if hasattr(tuning_row[metric_cols[0]], 'values') else tuning_row[metric_cols[0]]
+                    elif 'Training MSE' in tuning_row:
+                        train_metric = tuning_row['Training MSE'].values[0] if hasattr(tuning_row['Training MSE'], 'values') else tuning_row['Training MSE']
+                    
+                    if metric_cols[1] in tuning_row:
+                        val_metric = tuning_row[metric_cols[1]].values[0] if hasattr(tuning_row[metric_cols[1]], 'values') else tuning_row[metric_cols[1]]
+                    elif 'Validation MSE' in tuning_row:
+                        val_metric = tuning_row['Validation MSE'].values[0] if hasattr(tuning_row['Validation MSE'], 'values') else tuning_row['Validation MSE']
                     
                     gap = tuning_row['Gap'].values[0]
                     hyperparams = tuning_row['Hyperparameters'].values[0]
@@ -249,8 +284,8 @@ def combine_metrics_files(output_dir: Path, test_metrics_df=None) -> Path:
             
         combined_df.loc[len(combined_df)] = new_row
     
-    # Save to file with the new name
-    combined_df.to_csv(metrics_file_path, index=False)
+    # Save to file with UTF-8 encoding to handle R² symbol properly
+    combined_df.to_csv(metrics_file_path, index=False, encoding='utf-8')
     
     return metrics_file_path
 
