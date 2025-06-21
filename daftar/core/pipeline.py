@@ -401,6 +401,9 @@ class Pipeline:
             config=self.config,
         )
         
+        # Add metrics to predictions CSV for better integration
+        self._add_metrics_to_predictions_csv(fold_idx, fold_dir, metrics)
+        
         # ------------------------------------------------ persist model
         # Save model immediately after training
         model_path = fold_dir / f"best_model_fold_{fold_idx}.pkl"
@@ -417,6 +420,36 @@ class Pipeline:
             save_optuna_visualizations(
                 model.study, fold_idx, self.output_dir, self.config
             )
+            
+            # ----------------------------------------------------------------
+            # Now that the hyperparameter tuning summary file
+            # (hyperparam_tuning_fold_*.txt) has been generated, we can
+            # safely create/update the per-fold combined metrics file so the
+            # Training / Validation / Gap / Hyperparameters columns are
+            # populated correctly.
+            # ----------------------------------------------------------------
+            # Recreate a minimal test-metrics DataFrame for this fold
+            if self.config.problem_type == "regression":
+                test_metrics_df = pd.DataFrame({
+                    'fold': [fold_idx],
+                    'mse': [metrics.get('mse')],
+                    'rmse': [metrics.get('rmse')],
+                    'mae': [metrics.get('mae')],
+                    'r2': [metrics.get('r2')]
+                })
+            else:
+                # Classification metrics
+                test_metrics_dict = {
+                    'fold': [fold_idx],
+                    'accuracy': [metrics.get('accuracy')],
+                    'f1': [metrics.get('f1')]
+                }
+                if 'roc_auc' in metrics:
+                    test_metrics_dict['roc_auc'] = [metrics.get('roc_auc')]
+                test_metrics_df = pd.DataFrame(test_metrics_dict)
+
+            # Generate (or overwrite) the combined metrics CSV for this fold
+            combine_metrics_for_fold(fold_dir, fold_idx, test_metrics_df, self.config)
         
         # ------------------------------------------------ basic visualizations
         # Create basic visualizations immediately
@@ -556,11 +589,7 @@ class Pipeline:
                 
             metrics_df = pd.DataFrame(metrics_dict)
         
-        # Create combined metrics file for this fold
-        combine_metrics_for_fold(fold_dir, fold_idx, metrics_df, self.config)
-        
-        # Add metrics to predictions CSV for better integration
-        self._add_metrics_to_predictions_csv(fold_idx, fold_dir, metrics)
+
         
         return metrics
     
