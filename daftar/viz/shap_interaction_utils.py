@@ -695,30 +695,6 @@ def save_shap_interactions_analysis(
     combined_df.to_csv(combined_csv, index=False)
     artifacts["all_interactions"] = str(combined_csv)
     
-    # Create summary text first (always create this)
-    max_computed = max_features_compute if max_features_compute is not None else len(all_features)
-    summary_lines = [
-        "SHAP Interaction Analysis Summary",
-        "================================",
-        f"Features analyzed: {len(all_features)} (top {max_computed} by SHAP magnitude)",
-        f"Features displayed: {min(MAX_FEATURES_DISPLAY, len(all_features))}",
-        f"Total interactions: {len(combined_df)}",
-        f"Folds processed: {len(fold_interactions)}",
-        "",
-        "Top 10 strongest interactions:",
-    ]
-    
-    for i, row in combined_df.head(10).iterrows():
-        summary_lines.append(
-            f"{i+1:>2}. {row['feature1']} × {row['feature2']}: "
-            f"{row['interaction_strength']:.4f}"
-        )
-    
-    summary_text = "\n".join(summary_lines)
-    summary_path = interactions_dir / "interaction_summary.txt"
-    summary_path.write_text(summary_text)
-    artifacts["interaction_summary"] = str(summary_path)
-    
     # Generate visualizations
     try:
         # 1. Heatmap

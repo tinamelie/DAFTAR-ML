@@ -419,10 +419,10 @@ DAFTAR-ML_GrowthRate_random_forest_regression_cv5x3x3/
 ├── output_files_explanation.txt           # Detailed explanations of all output visualizations
 ├── config.json                            # Record of all settings used in the analysis
 ├── shap_feature_interactions/             # Feature interaction visualizations (regression only)
-│   ├── interaction_network.png            # Network graph of feature interactions
-│   ├── interaction_heatmap.png            # Heatmap of interaction strengths
-│   ├── all_interactions.csv               # Matrix of interaction strengths
-│   └── interaction_summary.txt            # Summary of interaction analysis
+│   ├── all_interactions.csv              # All pairwise interactions
+│   ├── interaction_heatmap.png           # Top features heatmap
+│   ├── interaction_network.png           # Network of strongest interactions  
+│   └── top_bottom_network.png            # Top positive vs negative features
 ├── per_class_shap/                        # Per-class feature analysis (classification only)
 │   ├── all_classes_shap_stats.csv         # Features important for each class
 │   ├── [class_name]_shap_impact.png       # Impact plots for each class
