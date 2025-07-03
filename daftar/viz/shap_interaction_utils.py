@@ -1,15 +1,5 @@
 """
 SHAP Feature Interaction Analysis
-=================================
-
-TreeExplainer computes pairwise feature interactions on test data (regression only)
-Sample-level: averages interactions across test samples per fold
-Cross-fold: aggregates interactions preserving feature union (no absence penalty)
-
-Three visualizations generated:
-1. HEATMAP: Top 20 features by total interaction strength
-2. NETWORK: Strongest feature interaction relationships
-3. TOP/BOTTOM: Interactions between top positive/negative SHAP features
 
 Note: Classification models are NOT supported due to TreeExplainer because I can't figure it out
 """
