@@ -1,19 +1,6 @@
 #!/usr/bin/env python
 """DAFTAR-ML Color System.
 
-This module provides all color definitions and utilities for DAFTAR-ML visualizations.
-It centralizes all color-related functionality into a single module, including:
-- Loading colors from YAML configuration
-- Color constants for all visualizations
-- Utility functions for color management
-- Visualization tools for color display
-
-Usage:
-    # Import constants directly:
-    from daftar.viz.colors import SHAP_POSITIVE_COLOR, SHAP_NEGATIVE_COLOR
-    
-    # Import utility functions:
-    from daftar.viz.colors import get_color_palette
 """
 
 import os
