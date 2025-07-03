@@ -2,28 +2,16 @@
 SHAP Feature Interaction Analysis
 =================================
 
-Technical Implementation:
-• ALL models use SHAP TreeExplainer directly for interaction computation
-• Only supports regression models for simplicity and reliability
-• Compatible with tree-based regression models: XGBoost, Random Forest
-
-Interaction Computation Process:
-1. TreeExplainer computes pairwise feature interactions on test data (regression only)
-2. Sample-level: averages interactions across test samples per fold
-3. Cross-fold: aggregates interactions preserving feature union (no absence penalty)
+TreeExplainer computes pairwise feature interactions on test data (regression only)
+Sample-level: averages interactions across test samples per fold
+Cross-fold: aggregates interactions preserving feature union (no absence penalty)
 
 Three visualizations generated:
 1. HEATMAP: Top 20 features by total interaction strength
 2. NETWORK: Strongest feature interaction relationships
 3. TOP/BOTTOM: Interactions between top positive/negative SHAP features
 
-Mathematical Properties:
-• Interaction matrices are forced symmetric (feature A×B = feature B×A)
-• Diagonal zeroed (self-interactions not meaningful)
-• Absolute values used for ranking/visualization only
-• Original computation preserves interaction directionality
-
-Note: Classification models are NOT supported due to TreeExplainer shape complexity
+Note: Classification models are NOT supported due to TreeExplainer because I can't figure it out
 """
 
 from pathlib import Path
